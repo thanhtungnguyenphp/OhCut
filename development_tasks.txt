@@ -1,0 +1,1080 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    DEVELOPMENT TASKS - VIDEO/AUDIO PROCESSING TOOL
+═══════════════════════════════════════════════════════════════════════════════
+
+Project: Python-based Video/Audio Processing Tool using FFmpeg
+Purpose: Tự động hóa xử lý video (cắt, nối, thêm intro/ads) cho dự án phim & clips
+Target: macOS environment với focus vào performance & reliability
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 1: MVP (2-3 TUẦN) - Priority: CRITICAL
+═══════════════════════════════════════════════════════════════════════════════
+
+□ TASK 1.1: Project Setup & Structure
+  ├─ Tạo cấu trúc thư mục project:
+  │  video_tool/
+  │  ├── src/
+  │  │   ├── __init__.py
+  │  │   ├── cli/              # CLI commands
+  │  │   ├── core/             # Core operations
+  │  │   ├── pipelines/        # Workflow pipelines
+  │  │   └── utils/            # Helper functions
+  │  ├── tests/
+  │  ├── configs/
+  │  ├── logs/
+  │  ├── requirements.txt
+  │  ├── setup.py
+  │  └── README.md
+  │
+  ├─ Dependencies cần cài:
+  │  - typer (CLI framework)
+  │  - rich (console output)
+  │  - pydantic (validation)
+  │  - pytest (testing)
+  │  - pyyaml (config files)
+  │
+  └─ Deliverable:
+     - Skeleton project hoạt động được
+     - requirements.txt đầy đủ
+     - README.md với installation instructions
+
+  Estimated: 1 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.2: FFmpeg Runner Module
+  ├─ File: src/core/ffmpeg_runner.py
+  │
+  ├─ Functions cần implement:
+  │  - check_ffmpeg_installed() → bool
+  │  - get_ffmpeg_version() → str
+  │  - run_ffmpeg(args: list, progress_callback=None) → dict
+  │  - parse_ffmpeg_progress(stderr_line: str) → dict
+  │
+  ├─ Features:
+  │  - Error handling với custom exceptions
+  │  - Progress parsing từ FFmpeg stderr
+  │  - Logging tất cả commands & outputs
+  │  - Timeout mechanism
+  │  - Return dict: {success: bool, stdout: str, stderr: str, return_code: int}
+  │
+  └─ Testing:
+     - Test với valid/invalid commands
+     - Test progress parsing
+     - Test timeout scenarios
+
+  Estimated: 2 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.3: File Utilities & Validation
+  ├─ File: src/utils/file_utils.py
+  │
+  ├─ Functions:
+  │  - validate_input_file(path: str) → bool
+  │  - get_video_info(path: str) → dict  # Dùng ffprobe
+  │  - ensure_output_dir(path: str) → None
+  │  - generate_temp_filename(prefix: str) → str
+  │  - atomic_move(src: str, dst: str) → None
+  │
+  ├─ Video Info trả về:
+  │  {duration, width, height, codec, bitrate, fps, audio_codec, format}
+  │
+  └─ Deliverable:
+     - Validation robust cho input files
+     - Helper functions cho file operations
+
+  Estimated: 1 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.4: Core Operation - Cut Video
+  ├─ File: src/core/video_ops.py
+  │
+  ├─ Function: cut_by_duration()
+  │  Parameters:
+  │    - input_path: str
+  │    - output_dir: str
+  │    - segment_duration: int (seconds)
+  │    - copy_codec: bool = True
+  │    - prefix: str = "part"
+  │  
+  │  Logic:
+  │    1. Validate input file
+  │    2. Get video duration
+  │    3. Calculate số segments cần thiết
+  │    4. Dùng FFmpeg -c copy -f segment -segment_time
+  │    5. Đặt tên output: prefix_001.mp4, prefix_002.mp4...
+  │  
+  │  Return: List[str] (danh sách output files)
+  │
+  └─ Testing:
+     - Test với video ngắn/dài
+     - Test copy vs re-encode
+     - Test với different formats
+
+  Estimated: 2 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.5: Core Operation - Concat Videos
+  ├─ File: src/core/video_ops.py
+  │
+  ├─ Function: concat_videos()
+  │  Parameters:
+  │    - input_files: List[str]
+  │    - output_path: str
+  │    - copy_codec: bool = True
+  │    - validate_compatibility: bool = True
+  │  
+  │  Logic:
+  │    1. Validate all input files
+  │    2. Check codec compatibility (nếu enabled)
+  │    3. Create concat demuxer file list
+  │    4. Run FFmpeg concat
+  │    5. Cleanup temp files
+  │  
+  │  Concat file format:
+  │    file '/path/to/part1.mp4'
+  │    file '/path/to/part2.mp4'
+  │
+  └─ Testing:
+     - Test với 2, 5, 10 files
+     - Test mixed codecs (should fail hoặc re-encode)
+
+  Estimated: 2 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.6: Core Operation - Extract Audio
+  ├─ File: src/core/audio_ops.py
+  │
+  ├─ Function: extract_audio()
+  │  Parameters:
+  │    - input_path: str
+  │    - output_path: str
+  │    - codec: str = "copy"  # hoặc "aac", "mp3"
+  │    - bitrate: str = None  # e.g., "192k"
+  │  
+  │  FFmpeg command:
+  │    ffmpeg -i input.mp4 -vn -acodec copy output.m4a
+  │    hoặc: -acodec aac -b:a 192k output.aac
+  │
+  └─ Testing:
+     - Test copy mode
+     - Test re-encode với different codecs
+
+  Estimated: 1 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.7: Core Operation - Replace Audio
+  ├─ File: src/core/audio_ops.py
+  │
+  ├─ Function: replace_audio()
+  │  Parameters:
+  │    - video_path: str
+  │    - audio_path: str
+  │    - output_path: str
+  │    - copy_codecs: bool = True
+  │  
+  │  FFmpeg command:
+  │    ffmpeg -i video.mp4 -i audio.m4a -c:v copy -c:a copy \\
+  │           -map 0:v:0 -map 1:a:0 output.mp4
+  │
+  └─ Testing:
+     - Test với matching/mismatching durations
+     - Test với different audio codecs
+
+  Estimated: 1 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.8: Profile Configuration System
+  ├─ File: src/core/profiles.py
+  │
+  ├─ YAML config: configs/profiles.yaml
+  │  profiles:
+  │    movie_1080p:
+  │      video_codec: hevc_videotoolbox
+  │      video_bitrate: 4M
+  │      resolution: 1920x1080
+  │      audio_codec: aac
+  │      audio_bitrate: 192k
+  │    clip_720p:
+  │      video_codec: hevc_videotoolbox
+  │      video_bitrate: 2M
+  │      resolution: 1280x720
+  │      audio_codec: aac
+  │      audio_bitrate: 128k
+  │
+  ├─ Functions:
+  │  - load_profiles() → Dict
+  │  - get_profile(name: str) → Profile
+  │  - apply_profile_to_ffmpeg_args(profile: Profile) → List[str]
+  │
+  └─ Deliverable:
+     - Profile system working
+     - Default profiles for movies & clips
+
+  Estimated: 1 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-19
+
+
+□ TASK 1.9: CLI Commands
+  ├─ File: src/cli/main.py
+  │
+  ├─ Commands cần implement:
+  │  
+  │  1. video-tool cut
+  │     --input <path>
+  │     --duration <minutes> (default: 11)
+  │     --output-dir <path>
+  │     --prefix <string>
+  │     --no-copy (force re-encode)
+  │  
+  │  2. video-tool concat
+  │     --inputs <path1> <path2> ...
+  │     --output <path>
+  │     --no-copy
+  │  
+  │  3. video-tool audio extract
+  │     --input <path>
+  │     --output <path>
+  │     --codec [copy|aac|mp3]
+  │     --bitrate <string>
+  │  
+  │  4. video-tool audio replace
+  │     --video <path>
+  │     --audio <path>
+  │     --output <path>
+  │  
+  │  5. video-tool info
+  │     --input <path>
+  │     (Hiển thị video info dạng table với rich)
+  │
+  ├─ Global options:
+  │  --verbose / -v
+  │  --dry-run
+  │  --log-file <path>
+  │
+  └─ Deliverable:
+     - CLI hoạt động đầy đủ với help text
+     - Rich formatting cho output
+
+  Estimated: 3 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-20
+
+
+□ TASK 1.10: Logging System
+  ├─ File: src/utils/logger.py
+  │
+  ├─ Features:
+  │  - Console logging với rich
+  │  - File logging (rotating)
+  │  - Different log levels (DEBUG, INFO, WARNING, ERROR)
+  │  - Log FFmpeg commands & outputs
+  │  - Structured logs với context (job_id, operation, files)
+  │
+  └─ Config: configs/logging.yaml
+
+  Estimated: 1 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-20
+
+
+□ TASK 1.11: Unit Tests
+  ├─ Test files:
+  │  - tests/test_ffmpeg_runner.py
+  │  - tests/test_video_ops.py
+  │  - tests/test_audio_ops.py
+  │  - tests/test_file_utils.py
+  │  - tests/test_profiles.py
+  │
+  ├─ Test coverage target: > 70%
+  │
+  ├─ Test fixtures:
+  │  - Tạo/download sample videos nhỏ (< 5MB)
+  │  - Different formats: mp4, mkv
+  │  - Different codecs: h264, hevc
+  │
+  └─ CI setup:
+     - GitHub Actions workflow
+     - Run tests on push/PR
+
+  Estimated: 3 ngày
+  Assigned to: Jerry
+  Status: [x] DONE - 2025-11-20 (Sufficient Coverage: 133+ tests, 75% coverage)
+
+
+□ TASK 1.12: Documentation - Phase 1
+  ├─ README.md:
+  │  - Project overview
+  │  - Installation instructions
+  │  - Quick start guide
+  │  - Basic usage examples
+  │
+  └─ CONTRIBUTING.md:
+     - Development setup
+     - Code style guidelines
+     - How to run tests
+
+  Estimated: 1 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 2: PRODUCTION-READY (4-6 TUẦN) - Priority: HIGH
+═══════════════════════════════════════════════════════════════════════════════
+
+□ TASK 2.1: Database Schema & Job Tracking
+  ├─ Database: SQLite (jobs.db)
+  │
+  ├─ Tables:
+  │  
+  │  jobs:
+  │    - id: INTEGER PRIMARY KEY
+  │    - job_type: TEXT (cut, concat, extract_audio, etc.)
+  │    - status: TEXT (pending, running, completed, failed)
+  │    - input_files: TEXT (JSON array)
+  │    - output_files: TEXT (JSON array)
+  │    - config: TEXT (JSON)
+  │    - created_at: TIMESTAMP
+  │    - started_at: TIMESTAMP
+  │    - completed_at: TIMESTAMP
+  │    - error_message: TEXT
+  │    - retry_count: INTEGER
+  │    - progress: REAL (0-100)
+  │  
+  │  job_logs:
+  │    - id: INTEGER PRIMARY KEY
+  │    - job_id: INTEGER (FK)
+  │    - timestamp: TIMESTAMP
+  │    - level: TEXT
+  │    - message: TEXT
+  │
+  ├─ File: src/core/database.py
+  │  - init_database()
+  │  - create_job(job_type, input_files, config) → job_id
+  │  - update_job_status(job_id, status, progress=None)
+  │  - get_job(job_id) → Job
+  │  - list_jobs(filters) → List[Job]
+  │  - add_job_log(job_id, level, message)
+  │
+  └─ CLI commands:
+     - video-tool jobs list [--status <status>]
+     - video-tool jobs show <job_id>
+     - video-tool jobs retry <job_id>
+     - video-tool jobs clean [--older-than <days>]
+
+  Estimated: 3 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.2: Queue System
+  ├─ Implementation: Python multiprocessing.Queue + Worker Pool
+  │
+  ├─ File: src/core/queue.py
+  │  
+  │  Classes:
+  │    - JobQueue: Manage job queue
+  │    - Worker: Process jobs from queue
+  │    - WorkerPool: Manage multiple workers
+  │  
+  │  Features:
+  │    - Priority queue (HIGH, MEDIUM, LOW)
+  │    - Max concurrent workers configurable
+  │    - Worker health monitoring
+  │    - Graceful shutdown
+  │
+  ├─ CLI commands:
+  │  - video-tool worker start [--workers <n>]
+  │  - video-tool worker stop
+  │  - video-tool worker status
+  │
+  └─ Config: configs/queue.yaml
+     max_workers: 2
+     check_interval: 5
+
+  Estimated: 4 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.3: Advanced Operation - Change Speed
+  ├─ File: src/core/video_ops.py
+  │
+  ├─ Function: change_speed()
+  │  Parameters:
+  │    - input_path: str
+  │    - output_path: str
+  │    - speed: float (1.1, 1.25, 1.5, etc.)
+  │    - keep_pitch: bool = True
+  │  
+  │  FFmpeg filters:
+  │    Video: setpts=PTS/<speed>
+  │    Audio: atempo=<speed> (or atempo chain nếu > 2.0)
+  │
+  └─ Testing: Test với different speeds
+
+  Estimated: 2 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.4: Advanced Operation - Insert Ads
+  ├─ File: src/core/video_ops.py
+  │
+  ├─ Function: insert_ads()
+  │  Parameters:
+  │    - main_video: str
+  │    - ad_video: str
+  │    - positions: List[float]  # timestamps in seconds
+  │    - output_path: str
+  │  
+  │  Logic:
+  │    1. Split main video at positions
+  │    2. Interleave with ad videos
+  │    3. Concat all segments
+  │
+  └─ Testing: Insert ad ở đầu, giữa, cuối
+
+  Estimated: 3 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.5: Advanced Operation - Add Intro/Outro
+  ├─ File: src/core/video_ops.py
+  │
+  ├─ Function: add_intro_outro()
+  │  Parameters:
+  │    - main_video: str
+  │    - intro_video: str = None
+  │    - outro_video: str = None
+  │    - output_path: str
+  │  
+  │  Logic: Concat intro + main + outro
+  │
+  └─ Testing: Test với/không intro/outro
+
+  Estimated: 1 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.6: Pipeline - Movie to 11min Clips
+  ├─ File: src/pipelines/movie_pipeline.py
+  │
+  ├─ Function: movie_to_clips()
+  │  Parameters:
+  │    - input_movie: str
+  │    - output_dir: str
+  │    - clip_duration: int = 660  # 11 minutes
+  │    - profile: str = "clip_720p"
+  │    - metadata: dict = {title, genre, country, year}
+  │    - add_intro: bool = False
+  │    - intro_video: str = None
+  │  
+  │  Logic:
+  │    1. Validate input
+  │    2. Create job in database
+  │    3. Cut video into segments
+  │    4. Re-encode với profile (if needed)
+  │    5. Add intro to each segment (if enabled)
+  │    6. Generate filenames theo convention:
+  │       {title}_{country}_{year}_Part{N}.mp4
+  │    7. Move to output_dir (/media/movies/...)
+  │    8. Update job status
+  │  
+  │  Return: List[str] (output files)
+  │
+  └─ CLI command:
+     video-tool pipeline movie-to-clips \
+       --input movie.mp4 \
+       --output-dir /media/movies/Action/VN/2024 \
+       --title "Ten Phim" \
+       --genre Action \
+       --country VN \
+       --year 2024 \
+       --duration 11 \
+       --profile clip_720p \
+       --intro intro.mp4
+
+  Estimated: 4 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.7: Error Handling Enhancement
+  ├─ File: src/utils/exceptions.py
+  │
+  ├─ Custom Exceptions:
+  │  - VideoToolError (base)
+  │  - FFmpegError
+  │  - InvalidInputError
+  │  - UnsupportedCodecError
+  │  - InsufficientDiskSpaceError
+  │  - InvalidProfileError
+  │  - JobNotFoundError
+  │
+  ├─ Features:
+  │  - Graceful error handling in all operations
+  │  - Retry mechanism với exponential backoff
+  │  - Fallback strategies (H.265 fail → H.264)
+  │  - Detailed error messages
+  │  - Error logging to database
+  │
+  └─ Deliverable:
+     - Robust error handling throughout codebase
+
+  Estimated: 2 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.8: File Validation & Safety
+  ├─ Enhancements to file_utils.py
+  │
+  ├─ Features:
+  │  - Disk space check before operations
+  │  - File corruption detection (ffprobe validation)
+  │  - Atomic file operations (temp → final)
+  │  - File locking để tránh concurrent writes
+  │  - Automatic cleanup of temp files
+  │  - Backup mechanism (optional .bak files)
+  │
+  └─ Config options:
+     min_disk_space_gb: 10
+     enable_backup: true
+     cleanup_temp_on_success: true
+
+  Estimated: 2 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.9: FastAPI Backend (Basic)
+  ├─ File: src/api/main.py
+  │
+  ├─ Endpoints:
+  │  
+  │  POST /api/jobs/cut
+  │    Body: {input, output_dir, duration, ...}
+  │    Response: {job_id, status}
+  │  
+  │  POST /api/jobs/concat
+  │    Body: {inputs[], output, ...}
+  │  
+  │  GET /api/jobs/{job_id}
+  │    Response: {id, status, progress, ...}
+  │  
+  │  GET /api/jobs
+  │    Query: ?status=running&limit=10
+  │  
+  │  POST /api/jobs/{job_id}/retry
+  │  
+  │  GET /api/health
+  │    Response: {status: "ok", workers: 2, ...}
+  │
+  ├─ Features:
+  │  - Async endpoints
+  │  - Background job submission to queue
+  │  - CORS enabled
+  │  - Basic authentication (API key)
+  │
+  └─ CLI command:
+     video-tool api start [--port 8000] [--host 0.0.0.0]
+
+  Estimated: 5 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.10: Web UI - Frontend (Basic)
+  ├─ Technology: Simple HTML/CSS/JavaScript (hoặc React)
+  │
+  ├─ Pages:
+  │  
+  │  1. Dashboard:
+  │     - System status
+  │     - Active workers
+  │     - Recent jobs
+  │  
+  │  2. Jobs List:
+  │     - Table với jobs
+  │     - Filter by status
+  │     - Search by filename
+  │  
+  │  3. Job Detail:
+  │     - Full job info
+  │     - Progress bar
+  │     - Logs
+  │     - Actions (retry, cancel)
+  │  
+  │  4. Submit Job:
+  │     - Form để submit cut/concat jobs
+  │     - File upload (optional)
+  │     - Select operation & parameters
+  │
+  ├─ Features:
+  │  - Responsive design
+  │  - Real-time updates (polling hoặc WebSocket)
+  │  - Download results
+  │
+  └─ Deliverable:
+     - Basic working web UI
+     - Deployed cùng với API
+
+  Estimated: 7 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.11: Integration Tests
+  ├─ Test full workflows:
+  │  - Submit job → process → verify output
+  │  - Test movie-to-clips pipeline
+  │  - Test API endpoints
+  │  - Test queue system
+  │
+  └─ Test fixtures:
+     - Sample movies (varied lengths)
+     - Sample intro/ad videos
+
+  Estimated: 3 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.12: CI/CD Enhancement
+  ├─ GitHub Actions workflows:
+  │  
+  │  .github/workflows/test.yml:
+  │    - Run on push/PR
+  │    - Run linters (flake8, black, mypy)
+  │    - Run tests với coverage
+  │    - Upload coverage report
+  │  
+  │  .github/workflows/release.yml:
+  │    - Build on tag push
+  │    - Create release package
+  │    - Deploy to staging (optional)
+  │
+  └─ Pre-commit hooks:
+     - Format code với black
+     - Run flake8
+
+  Estimated: 2 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 2.13: Documentation - Phase 2
+  ├─ User Guide:
+  │  - Complete CLI reference
+  │  - Pipeline usage examples
+  │  - API documentation
+  │  - Web UI guide
+  │
+  ├─ Developer Guide:
+  │  - Architecture overview
+  │  - Code structure
+  │  - Adding new operations
+  │  - Database schema
+  │
+  └─ Deployment Guide:
+     - Installation on production
+     - Configuration best practices
+     - Systemd service setup (Linux)
+     - macOS LaunchAgent setup
+
+  Estimated: 3 ngày
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 3: ADVANCED FEATURES (2-3 THÁNG) - Priority: MEDIUM
+═══════════════════════════════════════════════════════════════════════════════
+
+□ TASK 3.1: Hardware Acceleration
+  ├─ VideoToolbox support (macOS)
+  ├─ NVENC support (NVIDIA GPU)
+  ├─ Auto-detection & fallback to software
+  ├─ Benchmark performance comparison
+  └─ Documentation: Hardware acceleration guide
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.2: Metadata Management
+  ├─ Extract metadata from videos
+  ├─ Edit metadata (title, artist, year, etc.)
+  ├─ Auto-generate from folder structure
+  ├─ Thumbnail extraction & setting
+  └─ CLI & API support
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.3: Subtitle Support
+  ├─ Extract subtitles (SRT, ASS, VTT)
+  ├─ Embed subtitles (hard/soft)
+  ├─ Convert subtitle formats
+  ├─ Optional: Whisper integration for auto-generation
+  └─ Testing với multiple subtitle tracks
+
+  Estimated: 2 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.4: Watermark Feature
+  ├─ Add image/text watermark
+  ├─ Configurable position, opacity, size
+  ├─ Support animated watermarks
+  └─ Templates cho common watermarks
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.5: Quality Analysis
+  ├─ VMAF scoring implementation
+  ├─ PSNR/SSIM metrics
+  ├─ Auto quality check after encode
+  ├─ Alert on quality degradation
+  └─ Quality reports
+
+  Estimated: 2 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.6: Performance Monitoring
+  ├─ Prometheus metrics integration
+  ├─ Grafana dashboard templates
+  ├─ Resource usage tracking (CPU, RAM, Disk)
+  ├─ Performance benchmarks
+  └─ Auto-throttling based on system load
+
+  Estimated: 2 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.7: Caching Layer
+  ├─ Cache video metadata
+  ├─ Cache extracted audio
+  ├─ Cache thumbnails
+  ├─ LRU cache với size limits
+  └─ Cache management commands
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.8: Docker & Deployment
+  ├─ Create Dockerfile
+  ├─ docker-compose.yml (app + db + redis)
+  ├─ Multi-stage build optimization
+  ├─ Environment configuration
+  └─ Deployment documentation
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.9: Batch Operations Enhancement
+  ├─ CSV/Excel batch input
+  ├─ Directory processing
+  ├─ Recursive folder scanning
+  ├─ Batch templates
+  └─ Progress reporting for batches
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 3.10: Documentation - Phase 3
+  ├─ Advanced features guide
+  ├─ Performance tuning guide
+  ├─ Troubleshooting guide
+  ├─ Video tutorials
+  └─ API v2 documentation
+
+  Estimated: 1 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 4: AI & CLOUD (ONGOING) - Priority: LOW
+═══════════════════════════════════════════════════════════════════════════════
+
+□ TASK 4.1: Scene Detection
+  ├─ Auto-detect scene changes
+  ├─ Smart cutting at scene boundaries
+  ├─ Chapter generation
+  └─ Integration with cutting operations
+
+  Estimated: 2 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 4.2: AI Features
+  ├─ Auto-crop detection
+  ├─ Silence removal
+  ├─ Content-aware ads insertion
+  ├─ Face detection/blur
+  └─ Quality: ML model integration
+
+  Estimated: 1 tháng
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 4.3: Cloud Storage Integration
+  ├─ AWS S3 support
+  ├─ Google Cloud Storage
+  ├─ Upload/download operations
+  ├─ Cloud processing (Lambda/Cloud Functions)
+  └─ Cost optimization strategies
+
+  Estimated: 2 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 4.4: Plugin System
+  ├─ Plugin architecture design
+  ├─ Plugin loader
+  ├─ Plugin API documentation
+  ├─ Sample plugins
+  └─ Plugin marketplace (optional)
+
+  Estimated: 3 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+□ TASK 4.5: Advanced Analytics
+  ├─ Usage statistics
+  ├─ Performance insights
+  ├─ Cost analysis
+  ├─ Optimization recommendations
+  └─ Reporting dashboard
+
+  Estimated: 2 tuần
+  Assigned to: 
+  Status: [ ] Not Started
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ONGOING TASKS
+═══════════════════════════════════════════════════════════════════════════════
+
+□ TASK O.1: Code Quality Maintenance
+  ├─ Regular code reviews
+  ├─ Refactoring technical debt
+  ├─ Keep dependencies updated
+  ├─ Security patches
+  └─ Performance profiling
+
+  Status: [ ] Ongoing
+
+
+□ TASK O.2: Testing Maintenance
+  ├─ Add tests for new features
+  ├─ Maintain test coverage > 80%
+  ├─ Update test fixtures
+  ├─ Fix flaky tests
+  └─ Performance regression tests
+
+  Status: [ ] Ongoing
+
+
+□ TASK O.3: Documentation Updates
+  ├─ Keep README current
+  ├─ Update API docs
+  ├─ Add new examples
+  ├─ User feedback incorporation
+  └─ Changelog maintenance
+
+  Status: [ ] Ongoing
+
+
+□ TASK O.4: User Support
+  ├─ Monitor issues/questions
+  ├─ Respond to bug reports
+  ├─ Feature requests evaluation
+  ├─ Community engagement
+  └─ FAQ updates
+
+  Status: [ ] Ongoing
+
+
+═══════════════════════════════════════════════════════════════════════════════
+NOTES & CONSIDERATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. DEPENDENCIES
+   - FFmpeg phải được cài đặt trên system
+   - VideoToolbox chỉ available trên macOS
+   - Một số features cần thêm dependencies (Whisper, ML models)
+
+2. PERFORMANCE
+   - Video encoding rất nặng CPU/IO
+   - Cần giới hạn concurrent jobs hợp lý (2-4 workers)
+   - Monitor disk space liên tục
+   - Consider SSD cho temp files
+
+3. TESTING
+   - Cần test videos với different:
+     * Codecs: H.264, H.265, VP9
+     * Resolutions: 480p, 720p, 1080p, 4K
+     * Containers: MP4, MKV, AVI
+     * Durations: short (<1min), medium (5-30min), long (>1hr)
+   - Integration tests mất nhiều thời gian (do encoding)
+   - Consider CI với caching
+
+4. DEPLOYMENT
+   - macOS environment là primary target
+   - Consider Linux support cho production servers
+   - Docker helpful cho consistent environments
+
+5. SECURITY
+   - Validate all user inputs
+   - Sanitize file paths
+   - API authentication/authorization
+   - Rate limiting cho API
+   - Secure secrets management
+
+6. SCALABILITY
+   - SQLite đủ cho single-machine
+   - Consider PostgreSQL + Redis cho multi-machine
+   - Distributed queue cho large-scale
+   - Load balancing cho API
+
+7. MONITORING
+   - Log everything (commands, errors, timings)
+   - Alert on failures
+   - Track resource usage
+   - Performance metrics
+
+8. BACKUP & RECOVERY
+   - Database backups
+   - Configuration backups
+   - Job replay capability
+   - Disaster recovery plan
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TIME ESTIMATES SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+Phase 1 (MVP):           ~20-25 ngày làm việc (3-4 tuần)
+Phase 2 (Production):    ~35-45 ngày làm việc (6-8 tuần)
+Phase 3 (Advanced):      ~45-60 ngày làm việc (2-3 tháng)
+Phase 4 (AI/Cloud):      ~60+ ngày làm việc (3+ tháng)
+
+TOTAL ESTIMATED:         ~160-190 ngày làm việc (~8-9 tháng for full implementation)
+
+Note: Estimates assume 1 full-time developer. Có thể nhanh hơn với team hoặc 
+      nếu scope reduced.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PRIORITY RECOMMENDATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+START IMMEDIATELY:
+  1. Project setup (Task 1.1)
+  2. FFmpeg runner (Task 1.2)
+  3. Core operations: cut, concat (Tasks 1.4, 1.5)
+
+CRITICAL FOR MVP:
+  - All Phase 1 tasks
+  - Must have working CLI tool với basic features
+
+HIGH VALUE:
+  - Movie-to-clips pipeline (Task 2.6)
+  - Job tracking & queue (Tasks 2.1, 2.2)
+  - Error handling (Task 2.7)
+
+NICE TO HAVE:
+  - Web UI (Tasks 2.9, 2.10)
+  - Advanced features (Phase 3)
+
+FUTURE:
+  - AI features (Phase 4)
+  - Cloud integration
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TRACKING & PROGRESS
+═══════════════════════════════════════════════════════════════════════════════
+
+Last Updated: 2025-11-20
+Project Start Date: 2025-11-19
+Expected MVP Date: 2025-12-10 (estimated)
+Current Phase: Phase 1 - MVP (83.3% complete)
+
+Progress:
+  Phase 1: [===========>] 11/12 tasks completed (91.7%)
+    ✅ 1.1 Project Setup & Structure
+    ✅ 1.2 FFmpeg Runner Module
+    ✅ 1.3 File Utilities & Validation
+    ✅ 1.4 Core Operation - Cut Video
+    ✅ 1.5 Core Operation - Concat Videos
+    ✅ 1.6 Core Operation - Extract Audio
+    ✅ 1.7 Core Operation - Replace Audio
+    ✅ 1.8 Profile Configuration System
+    ✅ 1.9 CLI Commands
+    ✅ 1.10 Logging System
+    ✅ 1.11 Unit Tests (133+ tests, 75% coverage)
+    ⏳ 1.12 Documentation - Phase 1 (final task)
+  
+  Phase 2: [ ] 0/13 tasks completed (0%)
+  Phase 3: [ ] 0/10 tasks completed (0%)
+  Phase 4: [ ] 0/5 tasks completed (0%)
+
+Total: 11/40 main tasks completed (27.5%)
+Phase 1 Status: 91.7% COMPLETE - Only documentation remaining!
+
+Core MVP Features READY FOR PRODUCTION:
+  ✅ FFmpeg Runner with progress parsing
+  ✅ File utilities and validation
+  ✅ Video operations (cut, concat)
+  ✅ Audio operations (extract, replace, mix)
+  ✅ 11 encoding profiles (movie, clip, web, mobile)
+  ✅ Full CLI with 9 commands
+  ✅ Rich console output and logging
+  ✅ 133+ tests with 75% coverage
+
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF DOCUMENT
+═══════════════════════════════════════════════════════════════════════════════

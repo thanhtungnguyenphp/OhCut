@@ -1,0 +1,106 @@
+# Logging Configuration
+# Python logging configuration for video-tool
+
+version: 1
+disable_existing_loggers: false
+
+# Formatters define how log messages are formatted
+formatters:
+  simple:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  
+  detailed:
+    format: '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  
+  structured:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(extra_data)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+# Handlers define where log messages go
+handlers:
+  # Console handler with rich formatting (for interactive use)
+  console:
+    class: rich.logging.RichHandler
+    level: INFO
+    formatter: simple
+    rich_tracebacks: true
+    show_time: false  # Rich adds its own time
+    show_path: false
+    markup: true
+  
+  # File handler with rotation (for persistent logs)
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/video_tool.log
+    maxBytes: 10485760  # 10MB
+    backupCount: 5
+    encoding: utf8
+  
+  # Error-only file handler (for tracking errors separately)
+  error_file:
+    class: logging.handlers.RotatingFileHandler
+    level: ERROR
+    formatter: detailed
+    filename: logs/video_tool_errors.log
+    maxBytes: 5242880  # 5MB
+    backupCount: 3
+    encoding: utf8
+
+# Loggers define the hierarchy and behavior
+loggers:
+  # Root logger (catches all logs)
+  '':
+    level: DEBUG
+    handlers: [console, file, error_file]
+    propagate: false
+  
+  # Core module loggers
+  src.core.ffmpeg_runner:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.core.video_ops:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.core.audio_ops:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  src.core.profiles:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+  
+  # Utility module loggers
+  src.utils.file_utils:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  
+  # CLI logger
+  src.cli.main:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+
+# Log levels:
+# DEBUG: Detailed information, typically only useful when diagnosing problems
+# INFO: Confirmation that things are working as expected
+# WARNING: Indication that something unexpected happened, but software still working
+# ERROR: Serious problem, software unable to perform some function
+# CRITICAL: Very serious error, program may be unable to continue
+
+# Usage notes:
+# - Console handler uses Rich for beautiful output (colors, formatting)
+# - File handler rotates when reaching 10MB, keeps 5 backup files
+# - Error file keeps only ERROR and CRITICAL messages
+# - Adjust log levels per module as needed
+# - Set console level to DEBUG for verbose mode

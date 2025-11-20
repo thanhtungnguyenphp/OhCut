@@ -1,0 +1,11 @@
+# Ignore generated video samples
+sample_*.mp4
+sample_*.m4a
+
+# Keep the generator script
+!generate_samples.py
+
+# Ignore test outputs
+output/
+temp/
+*.tmp

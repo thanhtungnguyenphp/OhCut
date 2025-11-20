@@ -1,0 +1,677 @@
+Dưới đây là bản tổng hợp & thiết kế khung cho tool Python xử lý video/audio của bạn, theo đúng nhu cầu dự án phim + clip 11 phút + quảng cáo/intro.
+
+1. Mục tiêu & chức năng chính của tool
+
+1.1. Nhóm chức năng Audio
+
+1. Tách âm thanh từ video
+◦  Input: 1 file video.
+◦  Output: file audio riêng (m4a/mp3).
+◦  Tùy chọn:
+▪  Copy nguyên track audio (không re-encode).
+▪  Re-encode với codec/bitrate chuẩn (AAC, 128–192 kbps).
+2. Ghép âm thanh vào video (thay audio)
+◦  Thay toàn bộ track audio của video bằng file audio mới.
+◦  Hoặc:
+▪  video + audio_gốc → tách audio_gốc.
+▪  trộn audio_gốc + audio_quảng_cáo → audio_mới.
+▪  ghép video + audio_mới.
+3. Thay đổi tốc độ âm thanh
+◦  Tăng/giảm tốc độ (1.1x, 1.25x, 1.5x…).
+◦  Lưu ý: giữ pitch hoặc chấp nhận thay đổi giọng (tùy use-case).
+4. Chèn đoạn âm thanh quảng cáo
+◦  Theo timecode (ví dụ: chèn vào phút thứ 1:00).
+◦  Hoặc chèn giữa các đoạn audio, nếu bạn cắt audio ra các đoạn.
+
+
+
+1.2. Nhóm chức năng Video
+
+1. Cắt video thành nhiều đoạn
+◦  Theo thời lượng mỗi đoạn (ví dụ: 11 phút = 660s).
+◦  Theo timeline tùy chỉnh (list start/end).
+◦  Giữ nguyên video (copy) hoặc re-encode theo profile.
+2. Nối nhiều video
+◦  Nối list part thành một video hoàn chỉnh.
+◦  Đảm bảo cùng codec/format để concat copy nhanh.
+3. Chèn intro/outro & quảng cáo khi nối
+◦  Flow ví dụ:
+▪  intro → part1 → ad → part2 → ad → part3 → outro.
+◦  Cho phép cấu hình:
+▪  intro_file, outro_file.
+▪  ad_file, ad mỗi N đoạn, hoặc theo vị trí cụ thể.
+4. Pipeline chuyên biệt cho dự án phim của bạn
+◦  “Biến 1 phim thành nhiều video 11 phút”:
+▪  Input: 1 phim gốc.
+▪  Output: nhiều part 11 phút, đặt tên chuẩn, lưu đúng thư mục /media/movies/....
+◦  “Xây clip hài có intro + quảng cáo”:
+▪  Input: list đoạn nguồn + file intro + file ad.
+▪  Output: 1 video hoàn chỉnh theo quy tắc.
+
+
+
+2. Giải pháp kỹ thuật (công nghệ & kiến trúc)
+
+2.1. Công cụ lõi: FFmpeg
+
+•  Gọi FFmpeg từ Python (qua subprocess hoặc ffmpeg-python).
+•  Dùng các filter/option chính:
+◦  Audio:
+▪  -vn, -acodec copy, -filter:a atempo=..., amix, concat.
+◦  Video:
+▪  -c copy, -f segment, -segment_time, concat demuxer, filter_complex khi cần.
+
+Ưu điểm:
+
+•  Rất mạnh, chuẩn công nghiệp.
+•  Hỗ trợ mọi codec/container cần dùng (H.264/H.265, mp4/mkv, AAC/MP3…).
+•  Tối ưu tốt performance.
+
+Nhược điểm:
+
+•  Cú pháp phức tạp; cần bọc tốt trong Python để dễ tái sử dụng.
+•  Debug pipeline filter phức tạp hơi khó.
+
+
+
+2.2. Thư viện Python nên dùng
+
+•  FFmpeg:
+◦  subprocess (khuyên dùng) để gọi ffmpeg trực tiếp.
+◦  Optional: ffmpeg-python nếu muốn pipeline kiểu OOP.
+•  CLI & cấu hình:
+◦  typer hoặc click: build command-line gọn, có help đẹp.
+◦  pydantic / dataclasses: define cấu hình job/preset, validate input.
+•  Logging & UX:
+◦  logging hoặc structlog.
+◦  rich: in log màu, table, progress bar.
+•  Batch & song song (tùy chọn):
+◦  concurrent.futures (ThreadPool/ProcessPool) để chạy nhiều job.
+◦  Cẩn thận: encode nặng CPU/IO → không nên quá nhiều worker.
+
+
+
+2.3. Cách tổ chức project (khung)
+
+Gợi ý cấu trúc:
+text
+Ví dụ CLI:
+
+•  video-tool audio extract --input in.mp4 --out out.m4a
+•  video-tool video cut --input in.mp4 --segment-min 11 --out-dir /media/...
+•  video-tool video concat --inputs a.mp4 b.mp4 --intro intro.mp4 --ad ad.mp4 --pattern every=1 --output final.mp4
+•  video-tool pipeline movie-11min --input raw.mp4 --genre Action --country VN --title "Ten Phim" --year 2024
+
+
+
+3. Ưu điểm & nhược điểm của giải pháp tổng thể
+
+3.1. Ưu điểm
+
+1. Tận dụng FFmpeg (chuẩn, mạnh, ổn định)  
+   → Bạn không phải tự xử lý codec, chỉ wrap logic.
+
+2. Tool Python có kiến trúc rõ ràng
+◦  Dễ bảo trì & mở rộng (thêm feature: watermark, subtitle, …).
+◦  Dễ tích hợp với hệ thống của bạn (Jellyfin, scripts quản lý file).
+3. Gắn chặt với layout thư mục media bạn đang dùng
+◦  Pipeline có thể xuất file trực tiếp vào:
+▪  /media/movies/...
+▪  /media/clips/...
+▪  /media/private/...
+◦  Giảm thao tác tay, tránh sai sót.
+4. Dễ tự động hóa/batch
+◦  Chạy trên cả thư mục (multiple phim / clips).
+◦  Dễ thiết lập cron/CI để xử lý file mới tự động.
+
+3.2. Nhược điểm / Rủi ro
+
+1. Độ phức tạp ban đầu
+◦  Cần thời gian để thiết kế tốt (không viết vội vài script).
+◦  Cần test kỹ pipeline FFmpeg.
+2. Hiệu năng & tài nguyên
+◦  Encode lại nhiều video sẽ rất nặng CPU/IO.
+◦  Cần kiểm soát số worker, ưu tiên job, tránh overload.
+3. Quản lý lỗi & khôi phục
+◦  FFmpeg fail giữa chừng, file partial cần xử lý:
+▪  Cần cơ chế log & đánh dấu trạng thái job (pending/running/done/failed).
+◦  Đảm bảo chạy lại không ghi đè bậy (idempotent).
+
+
+
+4. Gợi ý tối ưu & best practices
+
+4.1. Chuẩn hóa profile encode
+
+Để tiết kiệm dung lượng lâu dài:
+
+•  Chọn 1–2 profile chuẩn cho toàn hệ thống:
+
+Ví dụ:
+•  Movies:
+◦  Video: H.265, 1080p, 3–4 Mbps.
+◦  Audio: AAC, 128–192 kbps, 2.0/5.1 tùy nội dung.
+•  Clips 11 phút:
+◦  Video: H.265, 720p, 2 Mbps.
+◦  Audio: AAC, 128 kbps.
+
+Tool sẽ luôn encode output theo profile này → thống nhất, dễ quản lý, dung lượng tối ưu.
+
+4.2. Job file & preset
+
+•  Cho phép chạy bằng config file (YAML/JSON):
+yaml
+→ Tool đọc file job, thực hiện full pipeline:
+•  Encode về profile chuẩn.
+•  Cắt 11 phút.
+•  Thêm ad (nếu cấu hình).
+•  Đặt file vào đúng folder.
+
+4.3. Logging, dry-run, retry
+
+•  --dry-run: chỉ in ra lệnh FFmpeg sẽ chạy, không thực thi.
+•  Log JSON cho mỗi job:
+◦  input, output, status, thời gian, code FFmpeg.
+•  Có lệnh:
+◦  video-tool jobs list
+◦  video-tool jobs retry --failed
+
+
+
+5. Hướng triển khai tiếp theo
+
+Nếu bạn muốn bắt tay code:
+
+1. Bước 1:  
+◦  Tạo skeleton project như mục 2.3.
+◦  Viết ffmpeg_runner.run_ffmpeg() với logging cơ bản.
+2. Bước 2:  
+◦  Implement 2 tính năng đơn giản trước:
+▪  cut_by_duration (cắt 11 phút).
+▪  concat_videos (nối nhiều part).
+◦  Build CLI nhỏ để gọi 2 chức năng này.
+3. Bước 3:  
+◦  Thêm audio ops: tách/ghép audio, atempo.
+◦  Thêm “intro + ad” concat.
+4. Bước 4:  
+◦  Tích hợp với cấu trúc /media/... & preset cho dự án của bạn.
+
+Nếu bạn muốn, tôi có thể viết cho bạn một bản khung code Python cụ thể (có CLI + 1–2 lệnh hoạt động được) để bạn copy vào project và phát triển tiếp.
+
+
+
+6. Tối ưu nâng cao & mở rộng
+
+6.1. Cấu trúc Code & Architecture
+
+1. Database cho Job Tracking
+◦  Dùng SQLite hoặc PostgreSQL để lưu trạng thái jobs:
+▪  job_id, input_path, output_path, status, created_at, completed_at.
+▪  error_log, retry_count.
+◦  Cho phép:
+▪  Xem lịch sử jobs đã chạy.
+▪  Retry failed jobs.
+▪  Resume interrupted jobs.
+
+2. Queue System cho Batch Processing
+◦  Implement queue (Redis Queue, Celery, hoặc đơn giản hơn: Python Queue).
+◦  Ưu tiên jobs theo priority:
+▪  High: video cần gấp.
+▪  Medium: batch processing thông thường.
+▪  Low: background optimization.
+◦  Worker pool để xử lý nhiều jobs song song (với giới hạn tài nguyên).
+
+3. API Layer (Optional)
+◦  Thêm FastAPI backend:
+▪  REST API để submit jobs, check status, download results.
+▪  WebSocket cho real-time progress updates.
+◦  Cho phép control tool từ:
+▪  Web UI.
+▪  Mobile app.
+▪  Scripts tự động.
+
+4. Plugin Architecture
+◦  Cho phép extend tool bằng custom plugins:
+▪  Custom filters.
+▪  Custom pipelines.
+▪  Integration với services khác (cloud storage, CDN).
+
+
+
+6.2. Error Handling & Reliability
+
+1. Comprehensive Error Handling
+◦  Custom exceptions cho từng loại lỗi:
+▪  InvalidInputError, UnsupportedCodecError, InsufficientDiskSpaceError.
+◦  Graceful degradation:
+▪  Nếu H.265 encode fail → fallback về H.264.
+▪  Nếu copy mode fail → retry với re-encode.
+
+2. File Validation
+◦  Validate input files trước khi xử lý:
+▪  Check file exists, readable, valid format.
+▪  ffprobe để detect codec, resolution, duration.
+▪  Reject files không support hoặc corrupt.
+
+3. Transaction-like Operations
+◦  Atomic operations:
+▪  Write to temp file → validate → move to final location.
+▪  Nếu fail → xóa temp file, không để rác.
+◦  File locking để tránh race conditions khi multiple workers.
+
+4. Checkpointing
+◦  Cho long operations (encode phim dài):
+▪  Lưu checkpoint mỗi X phút.
+▪  Nếu crash → resume từ checkpoint cuối.
+◦  Especially quan trọng cho batch processing.
+
+5. Rollback Mechanism
+◦  Trước khi overwrite file gốc:
+▪  Backup to .bak hoặc temp folder.
+▪  Có option --rollback để khôi phục.
+
+
+
+6.3. Performance Optimization
+
+1. Hardware Acceleration
+◦  Sử dụng GPU encoding khi có:
+▪  macOS: VideoToolbox (-c:v h264_videotoolbox, hevc_videotoolbox).
+▪  NVIDIA: NVENC (-c:v h264_nvenc, hevc_nvenc).
+▪  Intel: QuickSync (-c:v h264_qsv, hevc_qsv).
+◦  Giảm thời gian encode 3–10x.
+◦  Có fallback về software encoding nếu GPU không available.
+
+2. Smart Caching
+◦  Cache intermediate results:
+▪  Extracted audio từ video → reuse nếu cần.
+▪  Generated thumbnails.
+◦  Cache metadata (duration, codec) để không cần chạy ffprobe lại.
+
+3. Resource Monitoring
+◦  Monitor CPU, RAM, Disk I/O trong real-time.
+◦  Tự động throttle số workers nếu system quá tải:
+▪  CPU > 90% → giảm concurrent jobs.
+▪  RAM < 1GB free → pause new jobs.
+◦  Alert nếu disk space thấp (< 10GB).
+
+4. Chunk Processing
+◦  Cho video rất lớn (> 10GB):
+▪  Cắt thành chunks nhỏ → process parallel → merge.
+▪  Giảm memory footprint.
+
+5. Profile-based Optimization
+◦  Preset encoding nhanh cho preview (-preset ultrafast).
+◦  Preset chậm nhưng chất lượng cao cho final output (-preset slow).
+
+
+
+6.4. User Experience Enhancements
+
+1. Web UI Dashboard
+◦  Giao diện web (React/Vue + FastAPI backend):
+▪  Upload video.
+▪  Select operations (cut, concat, add intro/ad).
+▪  Monitor progress với progress bar.
+▪  Download results.
+◦  Job history với filter, search.
+
+2. Real-time Progress Tracking
+◦  FFmpeg progress parsing:
+▪  Extract current time, fps, speed từ stderr.
+▪  Hiển thị % complete, ETA.
+◦  WebSocket updates cho web UI.
+◦  CLI: rich progress bar.
+
+3. Preview Capabilities
+◦  Generate thumbnails cho input/output.
+◦  Quick preview clip (first 10s) trước khi process full video.
+◦  Side-by-side comparison cho quality check.
+
+4. Batch Operations
+◦  CSV/Excel input cho batch jobs:
+▪  input_file, operation, output_file, params.
+◦  Process entire directory:
+▪  video-tool batch process-dir --dir /media/raw --operation cut --duration 11m
+
+5. Templates cho Common Workflows
+◦  Pre-defined templates:
+▪  "Movie to 11min clips"
+▪  "Add intro + ads to clips"
+▪  "Audio sync fix"
+◦  User có thể save custom templates.
+
+
+
+6.5. Features Mở Rộng
+
+1. Watermark & Logo
+◦  Chèn watermark/logo vào video:
+▪  Position: top-left, top-right, bottom-left, bottom-right, center.
+▪  Opacity, size adjustable.
+▪  Static hoặc animated.
+
+2. Subtitle Management
+◦  Extract subtitles từ video (SRT, ASS, VTT).
+◦  Embed subtitles vào video (hardcoded hoặc soft-sub).
+◦  Convert subtitle formats.
+◦  Auto-generate subtitles (integration với Whisper API).
+
+3. Quality Analysis
+◦  VMAF (Video Multimethod Assessment Fusion) scoring.
+◦  PSNR, SSIM metrics.
+◦  Tự động compare input vs output quality.
+◦  Alert nếu quality drop quá nhiều.
+
+4. Scene Detection
+◦  Tự động detect scene changes.
+◦  Smart cutting tại scene boundaries (tránh cắt giữa scene).
+◦  Generate chapters cho video dài.
+
+5. AI-Powered Features
+◦  Auto-crop detection (remove black bars).
+◦  Silence removal (tự động xóa đoạn im lặng trong audio).
+◦  Content-aware ads insertion:
+▪  Phân tích content → chèn ad vào timing phù hợp.
+◦  Face detection/blur (cho privacy).
+
+6. Cloud Storage Integration
+◦  Upload/download từ cloud:
+▪  AWS S3, Google Cloud Storage, Azure Blob.
+▪  Dropbox, Google Drive.
+◦  Process video trên cloud (Lambda, Cloud Functions).
+
+7. Metadata Management
+◦  Edit video metadata:
+▪  Title, artist, album, year.
+▪  Thumbnail (poster).
+▪  Tags, description.
+◦  Tự động generate metadata từ filename/folder structure.
+
+8. Multi-format Output
+◦  Generate multiple versions cùng lúc:
+▪  1080p, 720p, 480p.
+▪  MP4, WebM, MKV.
+◦  Adaptive bitrate streaming (HLS, DASH).
+
+
+
+6.6. DevOps & Monitoring
+
+1. Prometheus Metrics
+◦  Expose metrics cho monitoring:
+▪  jobs_total, jobs_success, jobs_failed.
+▪  encoding_duration_seconds.
+▪  queue_size, worker_utilization.
+◦  Visualize với Grafana.
+
+2. Structured Logging
+◦  Log format JSON:
+{
+  "timestamp": "2024-01-01T12:00:00Z",
+  "level": "INFO",
+  "job_id": "abc123",
+  "operation": "cut_video",
+  "input": "/path/to/input.mp4",
+  "output": "/path/to/output.mp4",
+  "duration_seconds": 45.3,
+  "status": "success"
+}
+◦  Dễ parse, query, alert.
+
+3. Health Check Endpoints
+◦  HTTP endpoints cho monitoring:
+▪  /health → system healthy?
+▪  /ready → ready to accept jobs?
+▪  /metrics → Prometheus metrics.
+
+4. Docker Containerization
+◦  Dockerfile với:
+▪  FFmpeg pre-installed.
+▪  Python dependencies.
+◦  docker-compose cho full stack (app + database + queue).
+◦  Dễ deploy, scale, reproduce environment.
+
+5. CI/CD Pipeline
+◦  GitHub Actions / GitLab CI:
+▪  Auto run tests on push.
+▪  Lint code (flake8, black, mypy).
+▪  Build Docker image.
+▪  Deploy to staging/production.
+
+6. Configuration Management
+◦  Separate config cho environments:
+▪  config.dev.yaml
+▪  config.prod.yaml
+◦  Environment variables cho secrets (API keys, DB password).
+◦  Config validation với pydantic.
+
+7. Backup & Recovery
+◦  Auto backup configurations.
+◦  Database backup schedule.
+◦  Disaster recovery plan:
+▪  Restore từ backup.
+▪  Replay failed jobs.
+
+
+
+6.7. Testing & Quality Assurance
+
+1. Unit Tests
+◦  Test từng function riêng lẻ:
+▪  cut_video(), concat_videos(), extract_audio().
+◦  Mock FFmpeg calls với expected output.
+◦  Coverage target: > 80%.
+
+2. Integration Tests
+◦  Test full pipelines end-to-end:
+▪  Input video → pipeline → validate output.
+◦  Use sample test videos (small file sizes).
+◦  Verify:
+▪  Output file exists.
+▪  Duration correct.
+▪  Codec correct.
+
+3. Performance Benchmarks
+◦  Benchmark operations:
+▪  Encode speed (fps).
+▪  Time to cut/concat.
+◦  Track performance regression.
+◦  Compare software vs hardware encoding.
+
+4. Test Fixtures
+◦  Maintain test video library:
+▪  Different codecs: H.264, H.265, VP9.
+▪  Different resolutions: 480p, 720p, 1080p, 4K.
+▪  Different containers: MP4, MKV, AVI.
+▪  Edge cases: corrupt files, missing audio, weird aspect ratios.
+
+5. Automated Regression Testing
+◦  Mỗi release:
+▪  Chạy full test suite.
+▪  Compare output với golden files (reference outputs).
+▪  Alert nếu có diff.
+
+6. Load Testing
+◦  Test với nhiều concurrent jobs:
+▪  Simulate 10, 50, 100 users submitting jobs.
+▪  Measure:
+▪  Throughput (jobs/hour).
+▪  Latency (time to complete).
+▪  Resource usage.
+
+
+
+6.8. Documentation
+
+1. API Reference
+◦  Auto-generate từ docstrings (Sphinx, MkDocs).
+◦  Document tất cả public functions, classes.
+◦  Include examples.
+
+2. User Guide
+◦  Getting started tutorial.
+◦  Common use cases:
+▪  "How to split a movie into 11-minute clips".
+▪  "How to add intro and ads".
+◦  CLI reference với examples.
+
+3. Architecture Documentation
+◦  Architecture Decision Records (ADR):
+▪  Why SQLite vs PostgreSQL?
+▪  Why Celery vs custom queue?
+◦  Component diagrams.
+◦  Data flow diagrams.
+
+4. Troubleshooting Guide
+◦  Common errors & solutions:
+▪  "FFmpeg not found" → install instructions.
+▪  "Out of memory" → reduce concurrent jobs.
+▪  "Codec not supported" → install codecs.
+◦  Debug mode instructions.
+◦  Log interpretation.
+
+5. Contributing Guide
+◦  Code style guidelines.
+◦  How to submit pull requests.
+◦  How to add new features.
+◦  How to write tests.
+
+6. Video Tutorials
+◦  Screen recordings cho:
+▪  Installation.
+▪  Basic operations.
+▪  Advanced features.
+◦  YouTube channel hoặc documentation site.
+
+
+
+7. Roadmap Triển Khai Đề Xuất
+
+7.1. Phase 1: MVP (2–3 tuần)
+
+•  Core FFmpeg wrapper:
+◦  run_ffmpeg() function với error handling cơ bản.
+◦  Progress parsing.
+•  Basic operations:
+◦  cut_by_duration() - cắt video theo thời lượng.
+◦  concat_videos() - nối videos.
+◦  extract_audio() - tách audio.
+◦  replace_audio() - thay audio.
+•  CLI với typer:
+◦  video-tool cut
+◦  video-tool concat
+◦  video-tool audio extract
+◦  video-tool audio replace
+•  Profile management:
+◦  Presets cho movies, clips.
+◦  YAML config files.
+•  Basic logging:
+◦  Log to file.
+◦  Console output với rich.
+•  Unit tests cho core functions.
+
+Deliverable: Working CLI tool với 4–5 commands, có thể xử lý video cơ bản.
+
+
+
+7.2. Phase 2: Production-Ready (4–6 tuần)
+
+•  Job queue system:
+◦  SQLite database cho job tracking.
+◦  Queue implementation (Python Queue hoặc Redis).
+◦  Worker pool với concurrent.futures.
+•  Advanced operations:
+◦  change_speed() - thay đổi tốc độ.
+◦  insert_ads() - chèn quảng cáo.
+◦  add_intro_outro() - thêm intro/outro.
+•  Pipeline for movie-to-clips:
+◦  Full automation cho use case chính.
+◦  Integration với /media folder structure.
+•  Web UI (basic):
+◦  FastAPI backend.
+◦  Simple React/Vue frontend.
+◦  Submit jobs, view status.
+•  Error handling:
+◦  Custom exceptions.
+◦  Retry logic.
+◦  File validation.
+•  Comprehensive testing:
+◦  Integration tests.
+◦  Test fixtures.
+◦  CI setup (GitHub Actions).
+
+Deliverable: Production-ready tool với web interface, có thể handle real workload.
+
+
+
+7.3. Phase 3: Advanced Features (2–3 tháng)
+
+•  Hardware acceleration:
+◦  VideoToolbox support (macOS).
+◦  NVENC support (NVIDIA).
+◦  Auto-detection và fallback.
+•  Metadata management:
+◦  Edit video metadata.
+◦  Thumbnail generation.
+◦  Auto-tagging.
+•  Subtitle support:
+◦  Extract, embed, convert.
+◦  Whisper integration cho auto-subtitles.
+•  Watermark feature.
+•  Quality analysis:
+◦  VMAF scoring.
+◦  Auto quality check.
+•  Monitoring & metrics:
+◦  Prometheus integration.
+◦  Grafana dashboards.
+•  Performance optimization:
+◦  Caching layer.
+◦  Resource monitoring.
+◦  Chunk processing.
+•  Docker & deployment:
+◦  Dockerfile.
+◦  docker-compose.
+◦  Deployment docs.
+
+Deliverable: Feature-complete tool với advanced capabilities, ready for scale.
+
+
+
+7.4. Phase 4: AI & Cloud (Ongoing)
+
+•  AI features:
+◦  Scene detection.
+◦  Auto-crop.
+◦  Silence removal.
+◦  Content-aware ads insertion.
+•  Cloud integration:
+◦  S3/GCS upload/download.
+◦  Cloud processing (Lambda).
+•  Plugin system:
+◦  Allow custom extensions.
+◦  Community plugins.
+•  Advanced analytics:
+◦  Usage statistics.
+◦  Performance insights.
+•  Multi-format adaptive streaming:
+◦  HLS/DASH generation.
+•  Mobile app (optional):
+◦  iOS/Android app.
+◦  Remote job submission.
+
+Deliverable: Cutting-edge tool với AI capabilities và cloud integration.
+
+
+
+8. Kết Luận
+
+Tool này có tiềm năng lớn nếu được implement đúng cách. Điểm mạnh là architecture rõ ràng và tận dụng FFmpeg. Điểm cần cải thiện là error handling, performance optimization, và testing.
+
+Ưu tiên triển khai theo roadmap:
+1.  MVP trước để có working tool nhanh.
+2.  Production-ready để ensure reliability.
+3.  Advanced features để tăng value.
+4.  AI/Cloud để differentiate.
+
+Đầu tư vào testing, monitoring, và documentation ngay từ đầu sẽ giúp tool dễ maintain và scale lâu dài.

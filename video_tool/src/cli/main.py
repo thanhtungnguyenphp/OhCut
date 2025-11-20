@@ -1,0 +1,466 @@
+#!/usr/bin/env python3
+"""
+Video Tool CLI
+Command-line interface for video and audio processing.
+"""
+
+import sys
+import os
+from pathlib import Path
+from typing import List, Optional
+import typer
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich import print as rprint
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from src.core import ffmpeg_runner, video_ops, audio_ops, profiles
+from src.utils import file_utils
+
+# Initialize Typer app
+app = typer.Typer(
+    name="video-tool",
+    help="Video and audio processing tool using FFmpeg",
+    add_completion=False,
+)
+
+# Create subcommands
+audio_app = typer.Typer(help="Audio operations")
+profiles_app = typer.Typer(help="Profile management")
+
+app.add_typer(audio_app, name="audio")
+app.add_typer(profiles_app, name="profiles")
+
+# Rich console for output
+console = Console()
+
+# Global state for options
+class GlobalState:
+    verbose: bool = False
+    dry_run: bool = False
+    log_file: Optional[str] = None
+
+state = GlobalState()
+
+
+@app.callback()
+def main(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without executing"),
+    log_file: Optional[str] = typer.Option(None, "--log-file", help="Path to log file"),
+):
+    """
+    Video Tool - Process videos and audio with FFmpeg
+    
+    A powerful command-line tool for video and audio processing tasks including
+    cutting, concatenating, audio extraction/replacement, and more.
+    """
+    state.verbose = verbose
+    state.dry_run = dry_run
+    state.log_file = log_file
+    
+    # Check FFmpeg installation
+    if not dry_run:
+        if not ffmpeg_runner.check_ffmpeg_installed():
+            console.print("[red]❌ Error: FFmpeg is not installed or not found in PATH[/red]")
+            console.print("\nPlease install FFmpeg:")
+            console.print("  macOS: brew install ffmpeg")
+            console.print("  Linux: sudo apt install ffmpeg")
+            raise typer.Exit(code=1)
+
+
+@app.command()
+def cut(
+    input: str = typer.Option(..., "--input", "-i", help="Input video file"),
+    output_dir: str = typer.Option(..., "--output-dir", "-o", help="Output directory for segments"),
+    duration: int = typer.Option(11, "--duration", "-d", help="Duration of each segment in minutes"),
+    prefix: str = typer.Option("part", "--prefix", "-p", help="Prefix for output filenames"),
+    no_copy: bool = typer.Option(False, "--no-copy", help="Force re-encode instead of codec copy"),
+    profile: Optional[str] = typer.Option(None, "--profile", help="Encoding profile to use (if re-encoding)"),
+):
+    """
+    Cut video into segments by duration.
+    
+    Example:
+        video-tool cut -i movie.mp4 -o ./output -d 11
+    """
+    console.print(f"\n[bold cyan]🎬 Cutting Video[/bold cyan]")
+    console.print(f"Input: {input}")
+    console.print(f"Duration: {duration} minutes per segment")
+    console.print(f"Output: {output_dir}")
+    
+    # Validate input
+    if not os.path.exists(input):
+        console.print(f"[red]❌ Error: Input file not found: {input}[/red]")
+        raise typer.Exit(code=1)
+    
+    if state.dry_run:
+        console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
+        
+        # Get video info
+        try:
+            info = file_utils.get_video_info(input)
+            duration_sec = info['duration']
+            segment_duration_sec = duration * 60
+            num_segments = (duration_sec + segment_duration_sec - 1) // segment_duration_sec
+            
+            console.print(f"\nVideo duration: {duration_sec:.1f} seconds")
+            console.print(f"Segment duration: {segment_duration_sec} seconds")
+            console.print(f"Number of segments: {num_segments}")
+            console.print(f"\nWould create files:")
+            for i in range(num_segments):
+                console.print(f"  - {output_dir}/{prefix}_{i+1:03d}.mp4")
+        except Exception as e:
+            console.print(f"[red]❌ Error getting video info: {e}[/red]")
+            raise typer.Exit(code=1)
+        
+        return
+    
+    # Execute cut
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Cutting video...", total=None)
+            
+            def progress_callback(info: dict):
+                if 'percent' in info:
+                    progress.update(task, completed=info['percent'], total=100)
+            
+            output_files = video_ops.cut_by_duration(
+                input_path=input,
+                output_dir=output_dir,
+                segment_duration=duration * 60,  # Convert to seconds
+                copy_codec=not no_copy,
+                prefix=prefix,
+                profile_name=profile,
+            )
+        
+        console.print(f"\n[green]✅ Success! Created {len(output_files)} segments:[/green]")
+        for f in output_files:
+            console.print(f"  ✓ {f}")
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def concat(
+    inputs: List[str] = typer.Option(..., "--inputs", "-i", help="Input video files (can specify multiple times)"),
+    output: str = typer.Option(..., "--output", "-o", help="Output video file"),
+    no_copy: bool = typer.Option(False, "--no-copy", help="Force re-encode instead of codec copy"),
+    no_validate: bool = typer.Option(False, "--no-validate", help="Skip codec compatibility validation"),
+    profile: Optional[str] = typer.Option(None, "--profile", help="Encoding profile to use (if re-encoding)"),
+):
+    """
+    Concatenate multiple videos into one.
+    
+    Example:
+        video-tool concat -i part1.mp4 -i part2.mp4 -i part3.mp4 -o final.mp4
+    """
+    console.print(f"\n[bold cyan]🎬 Concatenating Videos[/bold cyan]")
+    console.print(f"Input files ({len(inputs)}):")
+    for i, f in enumerate(inputs, 1):
+        console.print(f"  {i}. {f}")
+    console.print(f"Output: {output}")
+    
+    # Validate inputs
+    for input_file in inputs:
+        if not os.path.exists(input_file):
+            console.print(f"[red]❌ Error: Input file not found: {input_file}[/red]")
+            raise typer.Exit(code=1)
+    
+    if state.dry_run:
+        console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
+        console.print(f"\nWould concatenate {len(inputs)} files into: {output}")
+        return
+    
+    # Execute concat
+    try:
+        with console.status("[bold green]Concatenating videos..."):
+            video_ops.concat_videos(
+                input_files=inputs,
+                output_path=output,
+                copy_codec=not no_copy,
+                validate_compatibility=not no_validate,
+                profile_name=profile,
+            )
+        
+        console.print(f"\n[green]✅ Success! Created: {output}[/green]")
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def info(
+    input: str = typer.Option(..., "--input", "-i", help="Input video file"),
+):
+    """
+    Display video file information.
+    
+    Example:
+        video-tool info -i movie.mp4
+    """
+    # Validate input
+    if not os.path.exists(input):
+        console.print(f"[red]❌ Error: Input file not found: {input}[/red]")
+        raise typer.Exit(code=1)
+    
+    # Get video info
+    try:
+        info_dict = file_utils.get_video_info(input)
+        
+        # Create table
+        table = Table(title=f"Video Information: {Path(input).name}", show_header=False)
+        table.add_column("Property", style="cyan", no_wrap=True)
+        table.add_column("Value", style="green")
+        
+        # Add rows
+        table.add_row("File", input)
+        table.add_row("Format", info_dict.get('format', 'N/A'))
+        
+        # Duration
+        duration = info_dict.get('duration', 0)
+        hours = int(duration // 3600)
+        minutes = int((duration % 3600) // 60)
+        seconds = int(duration % 60)
+        duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        table.add_row("Duration", f"{duration_str} ({duration:.1f}s)")
+        
+        # Video
+        width = info_dict.get('width', 0)
+        height = info_dict.get('height', 0)
+        table.add_row("Resolution", f"{width}x{height}")
+        table.add_row("Video Codec", info_dict.get('codec', 'N/A'))
+        table.add_row("Video Bitrate", info_dict.get('bitrate', 'N/A'))
+        table.add_row("FPS", f"{info_dict.get('fps', 0):.2f}")
+        
+        # Audio
+        table.add_row("Audio Codec", info_dict.get('audio_codec', 'N/A'))
+        
+        # File size
+        file_size = os.path.getsize(input)
+        size_mb = file_size / (1024 * 1024)
+        table.add_row("File Size", f"{size_mb:.2f} MB")
+        
+        console.print()
+        console.print(table)
+        console.print()
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@audio_app.command("extract")
+def audio_extract(
+    input: str = typer.Option(..., "--input", "-i", help="Input video file"),
+    output: str = typer.Option(..., "--output", "-o", help="Output audio file"),
+    codec: str = typer.Option("copy", "--codec", "-c", help="Audio codec (copy, aac, mp3, opus, flac)"),
+    bitrate: Optional[str] = typer.Option(None, "--bitrate", "-b", help="Audio bitrate (e.g., 192k, 128k)"),
+):
+    """
+    Extract audio from video.
+    
+    Example:
+        video-tool audio extract -i movie.mp4 -o audio.m4a --codec copy
+        video-tool audio extract -i movie.mp4 -o audio.mp3 --codec mp3 --bitrate 192k
+    """
+    console.print(f"\n[bold cyan]🎵 Extracting Audio[/bold cyan]")
+    console.print(f"Input: {input}")
+    console.print(f"Output: {output}")
+    console.print(f"Codec: {codec}")
+    if bitrate:
+        console.print(f"Bitrate: {bitrate}")
+    
+    # Validate input
+    if not os.path.exists(input):
+        console.print(f"[red]❌ Error: Input file not found: {input}[/red]")
+        raise typer.Exit(code=1)
+    
+    if state.dry_run:
+        console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
+        return
+    
+    # Execute extract
+    try:
+        with console.status("[bold green]Extracting audio..."):
+            audio_ops.extract_audio(
+                input_path=input,
+                output_path=output,
+                codec=codec,
+                bitrate=bitrate,
+            )
+        
+        console.print(f"\n[green]✅ Success! Created: {output}[/green]")
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@audio_app.command("replace")
+def audio_replace(
+    video: str = typer.Option(..., "--video", "-v", help="Input video file"),
+    audio: str = typer.Option(..., "--audio", "-a", help="Input audio file"),
+    output: str = typer.Option(..., "--output", "-o", help="Output video file"),
+):
+    """
+    Replace audio track in video.
+    
+    Example:
+        video-tool audio replace -v video.mp4 -a new_audio.m4a -o output.mp4
+    """
+    console.print(f"\n[bold cyan]🎵 Replacing Audio[/bold cyan]")
+    console.print(f"Video: {video}")
+    console.print(f"Audio: {audio}")
+    console.print(f"Output: {output}")
+    
+    # Validate inputs
+    if not os.path.exists(video):
+        console.print(f"[red]❌ Error: Video file not found: {video}[/red]")
+        raise typer.Exit(code=1)
+    
+    if not os.path.exists(audio):
+        console.print(f"[red]❌ Error: Audio file not found: {audio}[/red]")
+        raise typer.Exit(code=1)
+    
+    if state.dry_run:
+        console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
+        return
+    
+    # Execute replace
+    try:
+        with console.status("[bold green]Replacing audio track..."):
+            audio_ops.replace_audio(
+                video_path=video,
+                audio_path=audio,
+                output_path=output,
+            )
+        
+        console.print(f"\n[green]✅ Success! Created: {output}[/green]")
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@profiles_app.command("list")
+def profiles_list():
+    """
+    List all available encoding profiles.
+    
+    Example:
+        video-tool profiles list
+    """
+    try:
+        profile_names = profiles.list_profiles()
+        default = profiles.get_default_profile()
+        
+        console.print(f"\n[bold cyan]📋 Available Profiles ({len(profile_names)})[/bold cyan]\n")
+        
+        # Create table
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Profile", style="cyan", no_wrap=True)
+        table.add_column("Description", style="white")
+        table.add_column("Resolution", style="green")
+        table.add_column("Video", style="yellow")
+        table.add_column("HW Accel", style="blue")
+        
+        for name in profile_names:
+            profile = profiles.get_profile(name)
+            is_default = " [bold green](default)[/bold green]" if name == default.name else ""
+            hw_accel = "✓" if profile.uses_hardware_acceleration() else "✗"
+            
+            table.add_row(
+                f"{name}{is_default}",
+                profile.description,
+                profile.resolution,
+                profile.video_codec,
+                hw_accel,
+            )
+        
+        console.print(table)
+        console.print()
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@profiles_app.command("show")
+def profiles_show(
+    name: str = typer.Argument(..., help="Profile name"),
+):
+    """
+    Show detailed information about a profile.
+    
+    Example:
+        video-tool profiles show clip_720p
+    """
+    try:
+        profile = profiles.get_profile(name)
+        summary = profiles.get_profile_summary(profile)
+        
+        console.print()
+        console.print(summary)
+        console.print()
+    
+    except profiles.ProfileNotFoundError as e:
+        console.print(f"\n[red]❌ {e}[/red]")
+        console.print("\nUse 'video-tool profiles list' to see available profiles.")
+        raise typer.Exit(code=1)
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def version():
+    """Show version information."""
+    console.print("\n[bold cyan]Video Tool[/bold cyan] version [green]0.1.0[/green]")
+    
+    # Check FFmpeg version
+    try:
+        ffmpeg_version = ffmpeg_runner.get_ffmpeg_version()
+        console.print(f"FFmpeg: [green]{ffmpeg_version}[/green]")
+    except:
+        console.print("FFmpeg: [red]Not found[/red]")
+    
+    console.print()
+
+
+if __name__ == "__main__":
+    app()

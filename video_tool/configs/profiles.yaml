@@ -1,0 +1,135 @@
+# Video Encoding Profiles
+# Defines preset encoding configurations for different use cases
+#
+# Profile Structure:
+#   name:
+#     description: Brief description of the profile
+#     video_codec: FFmpeg video codec (e.g., libx264, libx265, hevc_videotoolbox)
+#     video_bitrate: Video bitrate (e.g., 2M, 4000k)
+#     resolution: Output resolution (e.g., 1920x1080, 1280x720, or 'source' to keep original)
+#     audio_codec: FFmpeg audio codec (e.g., aac, mp3, opus)
+#     audio_bitrate: Audio bitrate (e.g., 192k, 128k)
+#     preset: Encoding preset for software codecs (optional: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
+#     crf: Constant Rate Factor for quality-based encoding (optional: 0-51, lower is better quality)
+#     fps: Target frames per second (optional: 24, 25, 30, 60, or 'source' to keep original)
+#     hardware_accel: Hardware acceleration method (optional: videotoolbox, nvenc, qsv)
+
+profiles:
+  # High-quality profiles for archival and master copies
+  movie_1080p:
+    description: "High-quality 1080p profile for full-length movies (H.265/HEVC)"
+    video_codec: hevc_videotoolbox  # Use VideoToolbox on macOS (fallback to libx265 on other platforms)
+    video_bitrate: 4M
+    resolution: 1920x1080
+    audio_codec: aac
+    audio_bitrate: 192k
+    fps: source
+    hardware_accel: videotoolbox
+
+  movie_720p:
+    description: "Standard 720p profile for movies with good quality/size balance"
+    video_codec: hevc_videotoolbox
+    video_bitrate: 2500k
+    resolution: 1280x720
+    audio_codec: aac
+    audio_bitrate: 160k
+    fps: source
+    hardware_accel: videotoolbox
+
+  # Clip profiles optimized for shorter segments
+  clip_720p:
+    description: "Optimized 720p profile for 11-minute clips (balanced quality)"
+    video_codec: hevc_videotoolbox
+    video_bitrate: 2M
+    resolution: 1280x720
+    audio_codec: aac
+    audio_bitrate: 128k
+    fps: source
+    hardware_accel: videotoolbox
+
+  clip_480p:
+    description: "Lower-quality 480p profile for clips (smaller file size)"
+    video_codec: hevc_videotoolbox
+    video_bitrate: 1200k
+    resolution: 854x480
+    audio_codec: aac
+    audio_bitrate: 96k
+    fps: source
+    hardware_accel: videotoolbox
+
+  # Web-optimized profiles for streaming and online platforms
+  web_1080p:
+    description: "Web-optimized 1080p (H.264 for maximum compatibility)"
+    video_codec: libx264
+    video_bitrate: 3500k
+    resolution: 1920x1080
+    audio_codec: aac
+    audio_bitrate: 128k
+    preset: fast
+    fps: 30
+
+  web_720p:
+    description: "Web-optimized 720p (fast encoding, broad compatibility)"
+    video_codec: libx264
+    video_bitrate: 2M
+    resolution: 1280x720
+    audio_codec: aac
+    audio_bitrate: 128k
+    preset: fast
+    fps: 30
+
+  # Mobile-optimized profiles
+  mobile_720p:
+    description: "Mobile-optimized 720p (efficient for phones/tablets)"
+    video_codec: libx264
+    video_bitrate: 1500k
+    resolution: 1280x720
+    audio_codec: aac
+    audio_bitrate: 96k
+    preset: veryfast
+    fps: 30
+
+  mobile_480p:
+    description: "Mobile-optimized 480p (small file size for data savings)"
+    video_codec: libx264
+    video_bitrate: 800k
+    resolution: 854x480
+    audio_codec: aac
+    audio_bitrate: 64k
+    preset: veryfast
+    fps: 30
+
+  # Quality-based encoding profiles (CRF mode)
+  quality_high:
+    description: "Quality-based encoding (high quality, variable bitrate)"
+    video_codec: libx265
+    crf: 20
+    resolution: source
+    audio_codec: aac
+    audio_bitrate: 192k
+    preset: medium
+    fps: source
+
+  quality_medium:
+    description: "Quality-based encoding (medium quality, smaller files)"
+    video_codec: libx265
+    crf: 24
+    resolution: source
+    audio_codec: aac
+    audio_bitrate: 128k
+    preset: medium
+    fps: source
+
+  # Fast encoding profile for quick processing
+  fast:
+    description: "Fast encoding profile (quick turnaround, larger files)"
+    video_codec: libx264
+    video_bitrate: 3M
+    resolution: source
+    audio_codec: aac
+    audio_bitrate: 128k
+    preset: ultrafast
+    fps: source
+
+# Default profile to use when none is specified
+default_profile: clip_720p

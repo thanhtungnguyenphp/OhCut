@@ -1,0 +1,21 @@
+# Core Dependencies
+typer[all]==0.9.0           # CLI framework with rich support
+rich==13.7.0                # Beautiful console output
+pydantic==2.5.3             # Data validation
+pyyaml==6.0.1               # YAML configuration files
+
+# Testing
+pytest==7.4.3               # Testing framework
+pytest-cov==4.1.0           # Coverage plugin
+pytest-mock==3.12.0         # Mocking support
+
+# Development
+black==23.12.1              # Code formatter
+flake8==7.0.0               # Linter
+mypy==1.8.0                 # Type checker
+
+# Optional (for Phase 2+)
+# fastapi==0.108.0          # API framework
+# uvicorn==0.25.0           # ASGI server
+# sqlalchemy==2.0.25        # Database ORM
+# redis==5.0.1              # Queue system (optional)
