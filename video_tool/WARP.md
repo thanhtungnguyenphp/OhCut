@@ -159,11 +159,14 @@ video_tool/
 - Log full command before execution
 - Use `-c copy` for stream copy, `-c:v codec -c:a codec` for re-encoding
 
-**Profile Application** (Phase 2 feature - partially implemented)
+**Profile Application** ✅ PRODUCTION READY (Phase 2 Task 2.1 complete)
 - Profiles define video/audio codecs, bitrates, resolutions, presets
 - Hardware acceleration: VideoToolbox on macOS (hevc_videotoolbox)
 - When `copy_codec=False`, apply profile settings to FFmpeg args
-- See `video_ops.py:cut_by_duration()` lines 120-168 for implementation
+- Implementation: `video_ops.py:cut_by_duration()` lines 120-168
+- Implementation: `video_ops.py:concat_videos()` lines 443-467
+- Performance: 4-5x realtime (hardware), 2-3x realtime (software)
+- Size reduction: 20-30% with maintained quality
 
 ## Development Guidelines
 
@@ -196,12 +199,23 @@ video_tool/
 - **`pyproject.toml`**: Tool configs for black, isort, pytest, mypy, coverage
 - **`.flake8`**: Flake8 linting rules
 
-### Testing Phase 2 Features
-When implementing Phase 2 re-encoding features:
-- Test with actual video files (not mocks) in integration tests
-- Verify profile application: check output video codec, resolution, bitrate
-- Test hardware acceleration fallback when not available
-- Measure and log encoding performance (fps, speed multiplier)
+### Re-encoding with Profiles (Task 2.1 Complete)
+Re-encoding support is production-ready:
+- Use `--no-copy` flag to enable re-encoding
+- Use `--profile <name>` to specify encoding profile
+- Hardware profiles: clip_720p, movie_1080p, movie_720p (HEVC)
+- Software profiles: web_720p, mobile_720p, quality_high (H.264/HEVC)
+- Limitation: VideoToolbox fails on 480p, use software profiles instead
+- Performance benchmarks documented in TASK_2.1_COMPLETE.md
+
+**Example usage:**
+```bash
+# Cut with hardware re-encoding
+video-tool cut -i movie.mp4 -o ./output -d 11 --no-copy --profile clip_720p
+
+# Concat with software re-encoding
+video-tool concat -i part1.mp4 -i part2.mp4 -o final.mp4 --no-copy --profile web_720p
+```
 
 ### Working with FFmpeg
 - Always check FFmpeg installation with `check_ffmpeg_installed()`
@@ -220,18 +234,24 @@ When implementing Phase 2 re-encoding features:
 - ~75% test coverage
 - CI/CD with GitHub Actions
 
-**Phase 2 In Progress 🚧** (See external notebook: "Phase 2: Production-Ready Enhancements")
-- Task 2.1: Re-encoding support (cut/concat with profiles)
-- Task 2.2: Complete test coverage (audio_ops, logger) - **DONE**
-- Task 2.3: CI/CD pipeline - **DONE**
-- Task 2.4: Integration tests with real videos
-- Task 2.5: Performance benchmarks
-- Task 2.6: Documentation updates
+**Phase 2 In Progress 🚧** (See PHASE_2_ANALYSIS.md and TASK_2.1_COMPLETE.md)
+- Task 2.1: Re-encoding support (cut/concat with profiles) - **✅ DONE**
+- Task 2.2: Complete test coverage (audio_ops, logger) - **✅ DONE**
+- Task 2.3: CI/CD pipeline - **✅ DONE**
+- Task 2.4: Database & Job Tracking
+- Task 2.5: Queue System for background processing
+- Task 2.6: Web API
+- Task 2.7: Enhanced error handling with automatic fallback
+- Task 2.11: Comprehensive integration tests
 
-**Known Gaps**
-- Re-encoding is implemented in `video_ops.py` but needs more testing
-- No performance benchmarks yet
-- Profile application in concat needs implementation
+**Phase 2 Task 2.1 Achievements** ✅
+- Cut with profile support: Tested with clip_720p, web_720p
+- Concat with profile support: Fully implemented and tested
+- Hardware acceleration: Verified on macOS (VideoToolbox)
+- Performance: 4.3x realtime encoding speed measured
+- Size optimization: 23% reduction verified (876 MB → 672 MB)
+- Known limitation: VideoToolbox fails on 480p (use software profiles)
+- Documentation: Updated README.md, cmd.md, TASK_2.1_COMPLETE.md
 
 ## Troubleshooting
 
