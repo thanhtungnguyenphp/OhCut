@@ -244,12 +244,13 @@ def info(
         table.add_row("Duration", f"{duration_str} ({duration:.1f}s)")
         
         # Video
-        width = info_dict.get('width', 0)
-        height = info_dict.get('height', 0)
+        width = info_dict.get('width') or 0
+        height = info_dict.get('height') or 0
         table.add_row("Resolution", f"{width}x{height}")
-        table.add_row("Video Codec", info_dict.get('codec', 'N/A'))
-        table.add_row("Video Bitrate", info_dict.get('bitrate', 'N/A'))
-        table.add_row("FPS", f"{info_dict.get('fps', 0):.2f}")
+        table.add_row("Video Codec", str(info_dict.get('codec', 'N/A')))
+        table.add_row("Video Bitrate", str(info_dict.get('bitrate', 'N/A')))
+        fps_val = info_dict.get('fps') or 0
+        table.add_row("FPS", f"{float(fps_val):.2f}" if fps_val else "N/A")
         
         # Audio
         table.add_row("Audio Codec", info_dict.get('audio_codec', 'N/A'))
