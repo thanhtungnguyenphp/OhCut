@@ -83,6 +83,7 @@ def cut(
     prefix: str = typer.Option("part", "--prefix", "-p", help="Prefix for output filenames"),
     no_copy: bool = typer.Option(False, "--no-copy", help="Force re-encode instead of codec copy"),
     profile: Optional[str] = typer.Option(None, "--profile", help="Encoding profile to use (if re-encoding)"),
+    track_job: bool = typer.Option(False, "--track-job", help="Track job in database for history and monitoring"),
 ):
     """
     Cut video into segments by duration.
@@ -144,11 +145,15 @@ def cut(
                 copy_codec=not no_copy,
                 prefix=prefix,
                 profile_name=profile,
+                track_job=track_job,
             )
         
         console.print(f"\n[green]✅ Success! Created {len(output_files)} segments:[/green]")
         for f in output_files:
             console.print(f"  ✓ {f}")
+        
+        if track_job:
+            console.print(f"\n[cyan]ℹ️  Job tracked in database. Use 'video-tool jobs list' to view.[/cyan]")
     
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")

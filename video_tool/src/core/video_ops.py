@@ -12,9 +12,10 @@ import math
 from pathlib import Path
 from typing import List, Optional
 
-from core.ffmpeg_runner import run_ffmpeg, FFmpegError
-from core.profiles import get_profile, ProfileNotFoundError
-from utils.file_utils import (
+from .ffmpeg_runner import run_ffmpeg, FFmpegError
+from .profiles import get_profile, ProfileNotFoundError
+from .database import Database, JobStatus
+from ..utils.file_utils import (
     validate_input_file,
     get_video_info,
     ensure_output_dir,
@@ -33,6 +34,7 @@ def cut_by_duration(
     prefix: str = "part",
     start_number: int = 1,
     profile_name: Optional[str] = None,
+    track_job: bool = False,
 ) -> List[str]:
     """Cut video into segments by duration.
 
@@ -49,6 +51,8 @@ def cut_by_duration(
         start_number: Starting number for segment numbering (default: 1).
         profile_name: Encoding profile name to use when copy_codec=False.
                      If None, uses default encoding settings.
+        track_job: If True, create job record in database and track progress.
+                  If False, operate without job tracking (default).
 
     Returns:
         List[str]: List of paths to created segment files.
@@ -67,6 +71,24 @@ def cut_by_duration(
         >>> print(f"Created {len(segments)} segments")
         Created 10 segments
     """
+    # Initialize job tracking if requested
+    job_id = None
+    db = None
+    if track_job:
+        db = Database()
+        job_id = db.create_job(
+            job_type="cut",
+            input_files=[input_path],
+            config={
+                "segment_duration": segment_duration,
+                "copy_codec": copy_codec,
+                "prefix": prefix,
+                "profile_name": profile_name,
+            }
+        )
+        db.update_job_status(job_id, JobStatus.RUNNING)
+        logger.info(f"Created job {job_id} for cut operation")
+    
     # Validate inputs
     validate_input_file(input_path)
 
@@ -175,6 +197,12 @@ def cut_by_duration(
         result = run_ffmpeg(args)
     except FFmpegError as e:
         logger.error(f"Failed to cut video: {e}")
+        if track_job and job_id and db:
+            db.update_job_status(
+                job_id,
+                JobStatus.FAILED,
+                error_message=str(e)
+            )
         raise
 
     # Collect output files
@@ -192,7 +220,24 @@ def cut_by_duration(
             logger.warning(f"Expected segment not found: {segment_file}")
 
     if not output_files:
-        raise FFmpegError("No output segments were created", -1)
+        error = FFmpegError("No output segments were created", -1)
+        if track_job and job_id and db:
+            db.update_job_status(
+                job_id,
+                JobStatus.FAILED,
+                error_message=str(error)
+            )
+        raise error
+
+    # Mark job as completed if tracking
+    if track_job and job_id and db:
+        db.update_job_status(
+            job_id,
+            JobStatus.COMPLETED,
+            progress=100.0,
+            output_files=output_files
+        )
+        logger.info(f"Job {job_id} completed successfully")
 
     logger.info(f"Successfully created {len(output_files)} segments")
     return output_files
