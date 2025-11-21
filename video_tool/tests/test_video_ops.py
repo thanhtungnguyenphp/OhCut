@@ -19,7 +19,7 @@ class TestCutByDuration:
 
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -72,7 +72,7 @@ class TestCutByDuration:
 
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -106,7 +106,7 @@ class TestCutByDuration:
 
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -142,7 +142,7 @@ class TestCutByDuration:
 
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -182,7 +182,7 @@ class TestCutByDuration:
 
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -295,8 +295,8 @@ class TestConcatVideos:
     """Tests for concat_videos function."""
 
     @patch("core.video_ops.run_ffmpeg")
-    @patch("core.video_ops.cleanup_temp_files")
-    @patch("core.video_ops.generate_temp_filename")
+    @patch("utils.file_utils.cleanup_temp_files")
+    @patch("utils.file_utils.generate_temp_filename")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -351,8 +351,8 @@ class TestConcatVideos:
         assert "at least 2" in str(exc_info.value).lower()
 
     @patch("core.video_ops.run_ffmpeg")
-    @patch("core.video_ops.cleanup_temp_files")
-    @patch("core.video_ops.generate_temp_filename")
+    @patch("utils.file_utils.cleanup_temp_files")
+    @patch("utils.file_utils.generate_temp_filename")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -385,8 +385,8 @@ class TestConcatVideos:
         assert "incompatible codecs" in str(exc_info.value).lower()
 
     @patch("core.video_ops.run_ffmpeg")
-    @patch("core.video_ops.cleanup_temp_files")
-    @patch("core.video_ops.generate_temp_filename")
+    @patch("utils.file_utils.cleanup_temp_files")
+    @patch("utils.file_utils.generate_temp_filename")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -427,8 +427,8 @@ class TestConcatVideos:
         assert result == str(output_file)
 
     @patch("core.video_ops.run_ffmpeg")
-    @patch("core.video_ops.cleanup_temp_files")
-    @patch("core.video_ops.generate_temp_filename")
+    @patch("utils.file_utils.cleanup_temp_files")
+    @patch("utils.file_utils.generate_temp_filename")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.validate_input_file")
     def test_concat_videos_skips_validation_when_disabled(
@@ -458,8 +458,8 @@ class TestConcatVideos:
         assert result == str(output_file)
 
     @patch("core.video_ops.run_ffmpeg")
-    @patch("core.video_ops.cleanup_temp_files")
-    @patch("core.video_ops.generate_temp_filename")
+    @patch("utils.file_utils.cleanup_temp_files")
+    @patch("utils.file_utils.generate_temp_filename")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -537,7 +537,7 @@ class TestProfileBasedReEncoding:
     @patch("core.video_ops.get_profile")
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -660,8 +660,8 @@ class TestProfileBasedReEncoding:
 
     @patch("core.video_ops.get_profile")
     @patch("core.video_ops.run_ffmpeg")
-    @patch("core.video_ops.cleanup_temp_files")
-    @patch("core.video_ops.generate_temp_filename")
+    @patch("utils.file_utils.cleanup_temp_files")
+    @patch("utils.file_utils.generate_temp_filename")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")
@@ -680,7 +680,7 @@ class TestProfileBasedReEncoding:
         from core.profiles import Profile
         
         mock_validate.return_value = True
-        mock_video_info.return_value = {"codec": "h264", "width": 1920, "height": 1080"}
+        mock_video_info.return_value = {"codec": "h264", "width": 1920, "height": 1080}
         mock_temp_filename.return_value = str(tmp_path / "concat.txt")
         mock_ffmpeg.return_value = {"success": True, "returncode": 0}
         
@@ -714,7 +714,7 @@ class TestProfileBasedReEncoding:
     @patch("core.video_ops.get_profile")
     @patch("core.video_ops.run_ffmpeg")
     @patch("core.video_ops.check_disk_space")
-    @patch("core.video_ops.get_file_size")
+    @patch("utils.file_utils.get_file_size")
     @patch("core.video_ops.ensure_output_dir")
     @patch("core.video_ops.get_video_info")
     @patch("core.video_ops.validate_input_file")

@@ -12,10 +12,10 @@ import math
 from pathlib import Path
 from typing import List, Optional
 
-from .ffmpeg_runner import run_ffmpeg, FFmpegError
-from .profiles import get_profile, ProfileNotFoundError
-from .database import Database, JobStatus
-from ..utils.file_utils import (
+from core.ffmpeg_runner import run_ffmpeg, FFmpegError
+from core.profiles import get_profile, ProfileNotFoundError
+from core.database import Database, JobStatus
+from utils.file_utils import (
     validate_input_file,
     get_video_info,
     ensure_output_dir,
