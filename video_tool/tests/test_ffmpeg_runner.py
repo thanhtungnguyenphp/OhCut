@@ -86,7 +86,9 @@ class TestParseProgress:
 
     def test_parse_ffmpeg_progress_with_valid_line(self):
         """Test parsing a valid FFmpeg progress line."""
-        line = "frame=  100 fps=30.0 size=    1024kB time=00:00:04.00 bitrate=2000.5kbits/s speed=1.0x"
+        line = (
+            "frame=  100 fps=30.0 size=    1024kB time=00:00:04.00 bitrate=2000.5kbits/s speed=1.0x"
+        )
         progress = parse_ffmpeg_progress(line)
 
         assert progress is not None

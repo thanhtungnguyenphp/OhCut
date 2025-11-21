@@ -84,11 +84,11 @@ def cut_by_duration(
                 "copy_codec": copy_codec,
                 "prefix": prefix,
                 "profile_name": profile_name,
-            }
+            },
         )
         db.update_job_status(job_id, JobStatus.RUNNING)
         logger.info(f"Created job {job_id} for cut operation")
-    
+
     # Validate inputs
     validate_input_file(input_path)
 
@@ -127,11 +127,16 @@ def cut_by_duration(
 
     # Build FFmpeg command
     args = [
-        "-i", input_path,
-        "-f", "segment",  # Use segment muxer
-        "-segment_time", str(segment_duration),  # Duration per segment
-        "-segment_start_number", str(start_number),  # Starting number
-        "-reset_timestamps", "1",  # Reset timestamps for each segment
+        "-i",
+        input_path,
+        "-f",
+        "segment",  # Use segment muxer
+        "-segment_time",
+        str(segment_duration),  # Duration per segment
+        "-segment_start_number",
+        str(start_number),  # Starting number
+        "-reset_timestamps",
+        "1",  # Reset timestamps for each segment
     ]
 
     if copy_codec:
@@ -145,48 +150,55 @@ def cut_by_duration(
             try:
                 profile = get_profile(profile_name)
                 logger.info(f"Using profile: {profile_name}")
-                
+
                 # Apply profile settings
                 args.extend(["-c:v", profile.video_codec])
-                
+
                 # Video quality settings
                 if profile.crf is not None:
                     args.extend(["-crf", str(profile.crf)])
                 elif profile.video_bitrate:
                     args.extend(["-b:v", profile.video_bitrate])
-                
+
                 # Preset
                 if profile.preset:
                     args.extend(["-preset", profile.preset])
-                
+
                 # Resolution
-                if profile.resolution != 'source':
+                if profile.resolution != "source":
                     resolution_tuple = profile.get_resolution_tuple()
                     if resolution_tuple:
                         width, height = resolution_tuple
                         args.extend(["-s", f"{width}x{height}"])
-                
+
                 # FPS
-                if profile.fps and profile.fps != 'source':
+                if profile.fps and profile.fps != "source":
                     args.extend(["-r", str(profile.fps)])
-                
+
                 # Audio settings
                 args.extend(["-c:a", profile.audio_codec])
-                if profile.audio_codec != 'copy':
+                if profile.audio_codec != "copy":
                     args.extend(["-b:a", profile.audio_bitrate])
-                
+
             except ProfileNotFoundError as e:
                 logger.error(f"Profile error: {e}")
                 raise InvalidInputError(str(e))
         else:
             # Use default re-encoding settings
-            args.extend([
-                "-c:v", "libx264",  # H.264 video
-                "-preset", "medium",  # Encoding preset
-                "-crf", "23",  # Quality (lower = better, 18-28 reasonable)
-                "-c:a", "aac",  # AAC audio
-                "-b:a", "128k",  # Audio bitrate
-            ])
+            args.extend(
+                [
+                    "-c:v",
+                    "libx264",  # H.264 video
+                    "-preset",
+                    "medium",  # Encoding preset
+                    "-crf",
+                    "23",  # Quality (lower = better, 18-28 reasonable)
+                    "-c:a",
+                    "aac",  # AAC audio
+                    "-b:a",
+                    "128k",  # Audio bitrate
+                ]
+            )
             logger.info("Using default re-encoding settings")
 
     args.append(output_pattern)
@@ -198,11 +210,7 @@ def cut_by_duration(
     except FFmpegError as e:
         logger.error(f"Failed to cut video: {e}")
         if track_job and job_id and db:
-            db.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message=str(e)
-            )
+            db.update_job_status(job_id, JobStatus.FAILED, error_message=str(e))
         raise
 
     # Collect output files
@@ -222,21 +230,12 @@ def cut_by_duration(
     if not output_files:
         error = FFmpegError("No output segments were created", -1)
         if track_job and job_id and db:
-            db.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message=str(error)
-            )
+            db.update_job_status(job_id, JobStatus.FAILED, error_message=str(error))
         raise error
 
     # Mark job as completed if tracking
     if track_job and job_id and db:
-        db.update_job_status(
-            job_id,
-            JobStatus.COMPLETED,
-            progress=100.0,
-            output_files=output_files
-        )
+        db.update_job_status(job_id, JobStatus.COMPLETED, progress=100.0, output_files=output_files)
         logger.info(f"Job {job_id} completed successfully")
 
     logger.info(f"Successfully created {len(output_files)} segments")
@@ -307,9 +306,12 @@ def cut_by_timestamps(
 
         # Build FFmpeg command
         args = [
-            "-i", input_path,
-            "-ss", str(start),  # Start time
-            "-t", str(duration),  # Duration
+            "-i",
+            input_path,
+            "-ss",
+            str(start),  # Start time
+            "-t",
+            str(duration),  # Duration
         ]
 
         if copy_codec:
@@ -327,27 +329,34 @@ def cut_by_timestamps(
                         args.extend(["-b:v", profile.video_bitrate])
                     if profile.preset:
                         args.extend(["-preset", profile.preset])
-                    if profile.resolution != 'source':
+                    if profile.resolution != "source":
                         resolution_tuple = profile.get_resolution_tuple()
                         if resolution_tuple:
                             width, height = resolution_tuple
                             args.extend(["-s", f"{width}x{height}"])
-                    if profile.fps and profile.fps != 'source':
+                    if profile.fps and profile.fps != "source":
                         args.extend(["-r", str(profile.fps)])
                     args.extend(["-c:a", profile.audio_codec])
-                    if profile.audio_codec != 'copy':
+                    if profile.audio_codec != "copy":
                         args.extend(["-b:a", profile.audio_bitrate])
                 except ProfileNotFoundError as e:
                     logger.error(f"Profile error: {e}")
                     raise InvalidInputError(str(e))
             else:
-                args.extend([
-                    "-c:v", "libx264",
-                    "-preset", "medium",
-                    "-crf", "23",
-                    "-c:a", "aac",
-                    "-b:a", "128k",
-                ])
+                args.extend(
+                    [
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "medium",
+                        "-crf",
+                        "23",
+                        "-c:a",
+                        "aac",
+                        "-b:a",
+                        "128k",
+                    ]
+                )
 
         args.append(str(output_file))
 
@@ -474,9 +483,12 @@ def concat_videos(
 
         # Build FFmpeg command
         args = [
-            "-f", "concat",  # Use concat demuxer
-            "-safe", "0",  # Allow absolute paths
-            "-i", concat_file,  # Input is the concat file
+            "-f",
+            "concat",  # Use concat demuxer
+            "-safe",
+            "0",  # Allow absolute paths
+            "-i",
+            concat_file,  # Input is the concat file
         ]
 
         if copy_codec:
@@ -497,28 +509,35 @@ def concat_videos(
                         args.extend(["-b:v", profile.video_bitrate])
                     if profile.preset:
                         args.extend(["-preset", profile.preset])
-                    if profile.resolution != 'source':
+                    if profile.resolution != "source":
                         resolution_tuple = profile.get_resolution_tuple()
                         if resolution_tuple:
                             width, height = resolution_tuple
                             args.extend(["-s", f"{width}x{height}"])
-                    if profile.fps and profile.fps != 'source':
+                    if profile.fps and profile.fps != "source":
                         args.extend(["-r", str(profile.fps)])
                     args.extend(["-c:a", profile.audio_codec])
-                    if profile.audio_codec != 'copy':
+                    if profile.audio_codec != "copy":
                         args.extend(["-b:a", profile.audio_bitrate])
                 except ProfileNotFoundError as e:
                     logger.error(f"Profile error: {e}")
                     raise InvalidInputError(str(e))
             else:
                 # Use default re-encoding settings
-                args.extend([
-                    "-c:v", "libx264",
-                    "-preset", "medium",
-                    "-crf", "23",
-                    "-c:a", "aac",
-                    "-b:a", "128k",
-                ])
+                args.extend(
+                    [
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "medium",
+                        "-crf",
+                        "23",
+                        "-c:a",
+                        "aac",
+                        "-b:a",
+                        "128k",
+                    ]
+                )
                 logger.info("Using default re-encoding settings")
 
         args.append(output_path)

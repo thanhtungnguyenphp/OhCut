@@ -40,11 +40,13 @@ app.add_typer(jobs_app, name="jobs")
 # Rich console for output
 console = Console()
 
+
 # Global state for options
 class GlobalState:
     verbose: bool = False
     dry_run: bool = False
     log_file: Optional[str] = None
+
 
 state = GlobalState()
 
@@ -52,19 +54,21 @@ state = GlobalState()
 @app.callback()
 def main(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without executing"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without executing"
+    ),
     log_file: Optional[str] = typer.Option(None, "--log-file", help="Path to log file"),
 ):
     """
     Video Tool - Process videos and audio with FFmpeg
-    
+
     A powerful command-line tool for video and audio processing tasks including
     cutting, concatenating, audio extraction/replacement, and more.
     """
     state.verbose = verbose
     state.dry_run = dry_run
     state.log_file = log_file
-    
+
     # Check FFmpeg installation
     if not dry_run:
         if not ffmpeg_runner.check_ffmpeg_installed():
@@ -79,15 +83,21 @@ def main(
 def cut(
     input: str = typer.Option(..., "--input", "-i", help="Input video file"),
     output_dir: str = typer.Option(..., "--output-dir", "-o", help="Output directory for segments"),
-    duration: int = typer.Option(11, "--duration", "-d", help="Duration of each segment in minutes"),
+    duration: int = typer.Option(
+        11, "--duration", "-d", help="Duration of each segment in minutes"
+    ),
     prefix: str = typer.Option("part", "--prefix", "-p", help="Prefix for output filenames"),
     no_copy: bool = typer.Option(False, "--no-copy", help="Force re-encode instead of codec copy"),
-    profile: Optional[str] = typer.Option(None, "--profile", help="Encoding profile to use (if re-encoding)"),
-    track_job: bool = typer.Option(False, "--track-job", help="Track job in database for history and monitoring"),
+    profile: Optional[str] = typer.Option(
+        None, "--profile", help="Encoding profile to use (if re-encoding)"
+    ),
+    track_job: bool = typer.Option(
+        False, "--track-job", help="Track job in database for history and monitoring"
+    ),
 ):
     """
     Cut video into segments by duration.
-    
+
     Example:
         video-tool cut -i movie.mp4 -o ./output -d 11
     """
@@ -95,22 +105,22 @@ def cut(
     console.print(f"Input: {input}")
     console.print(f"Duration: {duration} minutes per segment")
     console.print(f"Output: {output_dir}")
-    
+
     # Validate input
     if not os.path.exists(input):
         console.print(f"[red]❌ Error: Input file not found: {input}[/red]")
         raise typer.Exit(code=1)
-    
+
     if state.dry_run:
         console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
-        
+
         # Get video info
         try:
             info = file_utils.get_video_info(input)
-            duration_sec = info['duration']
+            duration_sec = info["duration"]
             segment_duration_sec = duration * 60
             num_segments = (duration_sec + segment_duration_sec - 1) // segment_duration_sec
-            
+
             console.print(f"\nVideo duration: {duration_sec:.1f} seconds")
             console.print(f"Segment duration: {segment_duration_sec} seconds")
             console.print(f"Number of segments: {num_segments}")
@@ -120,9 +130,9 @@ def cut(
         except Exception as e:
             console.print(f"[red]❌ Error getting video info: {e}[/red]")
             raise typer.Exit(code=1)
-        
+
         return
-    
+
     # Execute cut
     try:
         with Progress(
@@ -133,11 +143,11 @@ def cut(
             console=console,
         ) as progress:
             task = progress.add_task("Cutting video...", total=None)
-            
+
             def progress_callback(info: dict):
-                if 'percent' in info:
-                    progress.update(task, completed=info['percent'], total=100)
-            
+                if "percent" in info:
+                    progress.update(task, completed=info["percent"], total=100)
+
             output_files = video_ops.cut_by_duration(
                 input_path=input,
                 output_dir=output_dir,
@@ -147,33 +157,42 @@ def cut(
                 profile_name=profile,
                 track_job=track_job,
             )
-        
+
         console.print(f"\n[green]✅ Success! Created {len(output_files)} segments:[/green]")
         for f in output_files:
             console.print(f"  ✓ {f}")
-        
+
         if track_job:
-            console.print(f"\n[cyan]ℹ️  Job tracked in database. Use 'video-tool jobs list' to view.[/cyan]")
-    
+            console.print(
+                f"\n[cyan]ℹ️  Job tracked in database. Use 'video-tool jobs list' to view.[/cyan]"
+            )
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
 
 @app.command()
 def concat(
-    inputs: List[str] = typer.Option(..., "--inputs", "-i", help="Input video files (can specify multiple times)"),
+    inputs: List[str] = typer.Option(
+        ..., "--inputs", "-i", help="Input video files (can specify multiple times)"
+    ),
     output: str = typer.Option(..., "--output", "-o", help="Output video file"),
     no_copy: bool = typer.Option(False, "--no-copy", help="Force re-encode instead of codec copy"),
-    no_validate: bool = typer.Option(False, "--no-validate", help="Skip codec compatibility validation"),
-    profile: Optional[str] = typer.Option(None, "--profile", help="Encoding profile to use (if re-encoding)"),
+    no_validate: bool = typer.Option(
+        False, "--no-validate", help="Skip codec compatibility validation"
+    ),
+    profile: Optional[str] = typer.Option(
+        None, "--profile", help="Encoding profile to use (if re-encoding)"
+    ),
 ):
     """
     Concatenate multiple videos into one.
-    
+
     Example:
         video-tool concat -i part1.mp4 -i part2.mp4 -i part3.mp4 -o final.mp4
     """
@@ -182,18 +201,18 @@ def concat(
     for i, f in enumerate(inputs, 1):
         console.print(f"  {i}. {f}")
     console.print(f"Output: {output}")
-    
+
     # Validate inputs
     for input_file in inputs:
         if not os.path.exists(input_file):
             console.print(f"[red]❌ Error: Input file not found: {input_file}[/red]")
             raise typer.Exit(code=1)
-    
+
     if state.dry_run:
         console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
         console.print(f"\nWould concatenate {len(inputs)} files into: {output}")
         return
-    
+
     # Execute concat
     try:
         with console.status("[bold green]Concatenating videos..."):
@@ -204,13 +223,14 @@ def concat(
                 validate_compatibility=not no_validate,
                 profile_name=profile,
             )
-        
+
         console.print(f"\n[green]✅ Success! Created: {output}[/green]")
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -221,7 +241,7 @@ def info(
 ):
     """
     Display video file information.
-    
+
     Example:
         video-tool info -i movie.mp4
     """
@@ -229,53 +249,54 @@ def info(
     if not os.path.exists(input):
         console.print(f"[red]❌ Error: Input file not found: {input}[/red]")
         raise typer.Exit(code=1)
-    
+
     # Get video info
     try:
         info_dict = file_utils.get_video_info(input)
-        
+
         # Create table
         table = Table(title=f"Video Information: {Path(input).name}", show_header=False)
         table.add_column("Property", style="cyan", no_wrap=True)
         table.add_column("Value", style="green")
-        
+
         # Add rows
         table.add_row("File", input)
-        table.add_row("Format", info_dict.get('format', 'N/A'))
-        
+        table.add_row("Format", info_dict.get("format", "N/A"))
+
         # Duration
-        duration = info_dict.get('duration', 0)
+        duration = info_dict.get("duration", 0)
         hours = int(duration // 3600)
         minutes = int((duration % 3600) // 60)
         seconds = int(duration % 60)
         duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         table.add_row("Duration", f"{duration_str} ({duration:.1f}s)")
-        
+
         # Video
-        width = info_dict.get('width') or 0
-        height = info_dict.get('height') or 0
+        width = info_dict.get("width") or 0
+        height = info_dict.get("height") or 0
         table.add_row("Resolution", f"{width}x{height}")
-        table.add_row("Video Codec", str(info_dict.get('codec', 'N/A')))
-        table.add_row("Video Bitrate", str(info_dict.get('bitrate', 'N/A')))
-        fps_val = info_dict.get('fps') or 0
+        table.add_row("Video Codec", str(info_dict.get("codec", "N/A")))
+        table.add_row("Video Bitrate", str(info_dict.get("bitrate", "N/A")))
+        fps_val = info_dict.get("fps") or 0
         table.add_row("FPS", f"{float(fps_val):.2f}" if fps_val else "N/A")
-        
+
         # Audio
-        table.add_row("Audio Codec", info_dict.get('audio_codec', 'N/A'))
-        
+        table.add_row("Audio Codec", info_dict.get("audio_codec", "N/A"))
+
         # File size
         file_size = os.path.getsize(input)
         size_mb = file_size / (1024 * 1024)
         table.add_row("File Size", f"{size_mb:.2f} MB")
-        
+
         console.print()
         console.print(table)
         console.print()
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -284,12 +305,16 @@ def info(
 def audio_extract(
     input: str = typer.Option(..., "--input", "-i", help="Input video file"),
     output: str = typer.Option(..., "--output", "-o", help="Output audio file"),
-    codec: str = typer.Option("copy", "--codec", "-c", help="Audio codec (copy, aac, mp3, opus, flac)"),
-    bitrate: Optional[str] = typer.Option(None, "--bitrate", "-b", help="Audio bitrate (e.g., 192k, 128k)"),
+    codec: str = typer.Option(
+        "copy", "--codec", "-c", help="Audio codec (copy, aac, mp3, opus, flac)"
+    ),
+    bitrate: Optional[str] = typer.Option(
+        None, "--bitrate", "-b", help="Audio bitrate (e.g., 192k, 128k)"
+    ),
 ):
     """
     Extract audio from video.
-    
+
     Example:
         video-tool audio extract -i movie.mp4 -o audio.m4a --codec copy
         video-tool audio extract -i movie.mp4 -o audio.mp3 --codec mp3 --bitrate 192k
@@ -300,16 +325,16 @@ def audio_extract(
     console.print(f"Codec: {codec}")
     if bitrate:
         console.print(f"Bitrate: {bitrate}")
-    
+
     # Validate input
     if not os.path.exists(input):
         console.print(f"[red]❌ Error: Input file not found: {input}[/red]")
         raise typer.Exit(code=1)
-    
+
     if state.dry_run:
         console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
         return
-    
+
     # Execute extract
     try:
         with console.status("[bold green]Extracting audio..."):
@@ -319,13 +344,14 @@ def audio_extract(
                 codec=codec,
                 bitrate=bitrate,
             )
-        
+
         console.print(f"\n[green]✅ Success! Created: {output}[/green]")
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -338,7 +364,7 @@ def audio_replace(
 ):
     """
     Replace audio track in video.
-    
+
     Example:
         video-tool audio replace -v video.mp4 -a new_audio.m4a -o output.mp4
     """
@@ -346,20 +372,20 @@ def audio_replace(
     console.print(f"Video: {video}")
     console.print(f"Audio: {audio}")
     console.print(f"Output: {output}")
-    
+
     # Validate inputs
     if not os.path.exists(video):
         console.print(f"[red]❌ Error: Video file not found: {video}[/red]")
         raise typer.Exit(code=1)
-    
+
     if not os.path.exists(audio):
         console.print(f"[red]❌ Error: Audio file not found: {audio}[/red]")
         raise typer.Exit(code=1)
-    
+
     if state.dry_run:
         console.print("\n[yellow]🔍 DRY RUN - No files will be created[/yellow]")
         return
-    
+
     # Execute replace
     try:
         with console.status("[bold green]Replacing audio track..."):
@@ -368,13 +394,14 @@ def audio_replace(
                 audio_path=audio,
                 output_path=output,
             )
-        
+
         console.print(f"\n[green]✅ Success! Created: {output}[/green]")
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -383,16 +410,16 @@ def audio_replace(
 def profiles_list():
     """
     List all available encoding profiles.
-    
+
     Example:
         video-tool profiles list
     """
     try:
         profile_names = profiles.list_profiles()
         default = profiles.get_default_profile()
-        
+
         console.print(f"\n[bold cyan]📋 Available Profiles ({len(profile_names)})[/bold cyan]\n")
-        
+
         # Create table
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Profile", style="cyan", no_wrap=True)
@@ -400,12 +427,12 @@ def profiles_list():
         table.add_column("Resolution", style="green")
         table.add_column("Video", style="yellow")
         table.add_column("HW Accel", style="blue")
-        
+
         for name in profile_names:
             profile = profiles.get_profile(name)
             is_default = " [bold green](default)[/bold green]" if name == default.name else ""
             hw_accel = "✓" if profile.uses_hardware_acceleration() else "✗"
-            
+
             table.add_row(
                 f"{name}{is_default}",
                 profile.description,
@@ -413,14 +440,15 @@ def profiles_list():
                 profile.video_codec,
                 hw_accel,
             )
-        
+
         console.print(table)
         console.print()
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -431,39 +459,42 @@ def profiles_show(
 ):
     """
     Show detailed information about a profile.
-    
+
     Example:
         video-tool profiles show clip_720p
     """
     try:
         profile = profiles.get_profile(name)
         summary = profiles.get_profile_summary(profile)
-        
+
         console.print()
         console.print(summary)
         console.print()
-    
+
     except profiles.ProfileNotFoundError as e:
         console.print(f"\n[red]❌ {e}[/red]")
         console.print("\nUse 'video-tool profiles list' to see available profiles.")
         raise typer.Exit(code=1)
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
 
 @jobs_app.command("list")
 def jobs_list(
-    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status (pending, running, completed, failed)"),
+    status: Optional[str] = typer.Option(
+        None, "--status", "-s", help="Filter by status (pending, running, completed, failed)"
+    ),
     limit: int = typer.Option(20, "--limit", "-n", help="Maximum number of jobs to show"),
 ):
     """
     List jobs with optional status filter.
-    
+
     Example:
         video-tool jobs list
         video-tool jobs list --status failed
@@ -471,7 +502,7 @@ def jobs_list(
     """
     try:
         db = Database()
-        
+
         # Parse status if provided
         status_filter = None
         if status:
@@ -481,21 +512,21 @@ def jobs_list(
                 console.print(f"[red]❌ Invalid status: {status}[/red]")
                 console.print("Valid statuses: pending, running, completed, failed")
                 raise typer.Exit(code=1)
-        
+
         jobs = db.list_jobs(status=status_filter, limit=limit)
-        
+
         if not jobs:
             console.print("\n[yellow]No jobs found.[/yellow]\n")
             return
-        
+
         # Create table
         title = f"Jobs ({len(jobs)}"
         if status_filter:
             title += f", status: {status}"
         title += ")"
-        
+
         console.print(f"\n[bold cyan]📋 {title}[/bold cyan]\n")
-        
+
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("ID", style="cyan", no_wrap=True)
         table.add_column("Type", style="blue")
@@ -503,7 +534,7 @@ def jobs_list(
         table.add_column("Progress", style="green")
         table.add_column("Created", style="yellow")
         table.add_column("Duration", style="magenta")
-        
+
         for job in jobs:
             # Color code status
             if job.status == JobStatus.COMPLETED:
@@ -514,7 +545,7 @@ def jobs_list(
                 status_text = "[yellow]▶ running[/yellow]"
             else:
                 status_text = "[dim]○ pending[/dim]"
-            
+
             # Calculate duration
             duration_text = "-"
             if job.completed_at and job.started_at:
@@ -527,7 +558,7 @@ def jobs_list(
                     duration_text = f"{duration_sec / 3600:.1f}h"
             elif job.started_at:
                 duration_text = "running..."
-            
+
             table.add_row(
                 str(job.id),
                 job.job_type,
@@ -536,14 +567,15 @@ def jobs_list(
                 job.created_at.strftime("%Y-%m-%d %H:%M"),
                 duration_text,
             )
-        
+
         console.print(table)
         console.print()
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -554,25 +586,25 @@ def jobs_show(
 ):
     """
     Show detailed information about a specific job.
-    
+
     Example:
         video-tool jobs show 1
     """
     try:
         db = Database()
         job = db.get_job(job_id)
-        
+
         if not job:
             console.print(f"\n[red]❌ Job {job_id} not found.[/red]\n")
             raise typer.Exit(code=1)
-        
+
         console.print(f"\n[bold cyan]📋 Job #{job.id}[/bold cyan]\n")
-        
+
         # Create details table
         table = Table(show_header=False, box=None)
         table.add_column("Property", style="bold cyan", no_wrap=True)
         table.add_column("Value", style="white")
-        
+
         # Status with color
         if job.status == JobStatus.COMPLETED:
             status_text = "[green]✓ completed[/green]"
@@ -582,47 +614,49 @@ def jobs_show(
             status_text = "[yellow]▶ running[/yellow]"
         else:
             status_text = "[dim]○ pending[/dim]"
-        
+
         table.add_row("Type", job.job_type)
         table.add_row("Status", status_text)
         table.add_row("Progress", f"{job.progress:.1f}%")
         table.add_row("Created", job.created_at.strftime("%Y-%m-%d %H:%M:%S"))
-        
+
         if job.started_at:
             table.add_row("Started", job.started_at.strftime("%Y-%m-%d %H:%M:%S"))
-        
+
         if job.completed_at:
             table.add_row("Completed", job.completed_at.strftime("%Y-%m-%d %H:%M:%S"))
             duration_sec = (job.completed_at - job.started_at).total_seconds()
             table.add_row("Duration", f"{duration_sec:.1f}s")
-        
+
         if job.retry_count > 0:
             table.add_row("Retries", str(job.retry_count))
-        
+
         table.add_row("Input Files", f"{len(job.input_files)} file(s)")
         for i, f in enumerate(job.input_files, 1):
             table.add_row("", f"  {i}. {f}")
-        
+
         if job.output_files:
             table.add_row("Output Files", f"{len(job.output_files)} file(s)")
             for i, f in enumerate(job.output_files, 1):
                 table.add_row("", f"  {i}. {f}")
-        
+
         if job.config:
             import json
+
             config_str = json.dumps(job.config, indent=2)
             table.add_row("Config", config_str)
-        
+
         if job.error_message:
             table.add_row("Error", f"[red]{job.error_message}[/red]")
-        
+
         console.print(table)
         console.print()
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -633,63 +667,65 @@ def jobs_logs(
 ):
     """
     Show log entries for a specific job.
-    
+
     Example:
         video-tool jobs logs 1
     """
     try:
         db = Database()
         job = db.get_job(job_id)
-        
+
         if not job:
             console.print(f"\n[red]❌ Job {job_id} not found.[/red]\n")
             raise typer.Exit(code=1)
-        
+
         logs = db.get_job_logs(job_id)
-        
+
         if not logs:
             console.print(f"\n[yellow]No logs found for job {job_id}.[/yellow]\n")
             return
-        
+
         console.print(f"\n[bold cyan]📝 Logs for Job #{job_id} ({len(logs)} entries)[/bold cyan]\n")
-        
+
         # Create logs table
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Time", style="yellow", no_wrap=True)
         table.add_column("Level", style="blue", no_wrap=True)
         table.add_column("Message", style="white")
-        
+
         for log in logs:
             # Color code log level
-            level = log['level']
-            if level == 'ERROR':
+            level = log["level"]
+            if level == "ERROR":
                 level_text = "[red]ERROR[/red]"
-            elif level == 'WARNING':
+            elif level == "WARNING":
                 level_text = "[yellow]WARN[/yellow]"
             else:
                 level_text = "[green]INFO[/green]"
-            
+
             # Parse timestamp
             from datetime import datetime
+
             try:
-                ts = datetime.fromisoformat(log['timestamp'])
+                ts = datetime.fromisoformat(log["timestamp"])
                 time_str = ts.strftime("%H:%M:%S")
             except:
-                time_str = log['timestamp']
-            
+                time_str = log["timestamp"]
+
             table.add_row(
                 time_str,
                 level_text,
-                log['message'],
+                log["message"],
             )
-        
+
         console.print(table)
         console.print()
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -700,51 +736,58 @@ def jobs_retry(
 ):
     """
     Retry a failed job.
-    
+
     Example:
         video-tool jobs retry 1
     """
     try:
         db = Database()
         job = db.get_job(job_id)
-        
+
         if not job:
             console.print(f"\n[red]❌ Job {job_id} not found.[/red]\n")
             raise typer.Exit(code=1)
-        
+
         if job.status != JobStatus.FAILED:
-            console.print(f"\n[yellow]⚠ Job {job_id} is not in failed status (current: {job.status.value}).[/yellow]\n")
+            console.print(
+                f"\n[yellow]⚠ Job {job_id} is not in failed status (current: {job.status.value}).[/yellow]\n"
+            )
             console.print("Only failed jobs can be retried.")
             raise typer.Exit(code=1)
-        
+
         console.print(f"\n[bold cyan]🔄 Retrying Job #{job_id}[/bold cyan]")
         console.print(f"Type: {job.job_type}")
         console.print(f"Previous error: {job.error_message}")
         console.print()
-        
+
         # Reset job status
         db.increment_retry_count(job_id)
         db.update_job_status(job_id, JobStatus.PENDING, progress=0.0)
-        
+
         console.print(f"[green]✅ Job {job_id} reset to pending status.[/green]")
-        console.print("\n[yellow]Note: Job will need to be executed manually with the original command.[/yellow]\n")
-    
+        console.print(
+            "\n[yellow]Note: Job will need to be executed manually with the original command.[/yellow]\n"
+        )
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
 
 @jobs_app.command("clean")
 def jobs_clean(
-    older_than: int = typer.Option(30, "--older-than", "-d", help="Remove completed jobs older than N days"),
+    older_than: int = typer.Option(
+        30, "--older-than", "-d", help="Remove completed jobs older than N days"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ):
     """
     Clean up old completed jobs from the database.
-    
+
     Example:
         video-tool jobs clean
         video-tool jobs clean --older-than 90
@@ -752,29 +795,29 @@ def jobs_clean(
     """
     try:
         db = Database()
-        
+
         if not force:
             confirm = typer.confirm(
-                f"\nRemove completed jobs older than {older_than} days?",
-                abort=True
+                f"\nRemove completed jobs older than {older_than} days?", abort=True
             )
-        
+
         console.print(f"\n[bold cyan]🧹 Cleaning up old jobs...[/bold cyan]\n")
-        
+
         deleted_count = db.cleanup_old_jobs(days=older_than)
-        
+
         if deleted_count > 0:
             console.print(f"[green]✅ Removed {deleted_count} old job(s).[/green]\n")
         else:
             console.print(f"[yellow]No jobs found older than {older_than} days.[/yellow]\n")
-    
+
     except typer.Abort:
         console.print("\n[yellow]Cancelled.[/yellow]\n")
-    
+
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
         if state.verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
 
@@ -783,14 +826,14 @@ def jobs_clean(
 def version():
     """Show version information."""
     console.print("\n[bold cyan]Video Tool[/bold cyan] version [green]0.1.0[/green]")
-    
+
     # Check FFmpeg version
     try:
         ffmpeg_version = ffmpeg_runner.get_ffmpeg_version()
         console.print(f"FFmpeg: [green]{ffmpeg_version}[/green]")
     except:
         console.print("FFmpeg: [red]Not found[/red]")
-    
+
     console.print()
 
 

@@ -23,7 +23,9 @@ class TestRealFFmpeg:
 
     def test_ffprobe_is_installed(self):
         """Test that ffprobe is actually installed on the system."""
-        assert check_ffprobe_installed() is True, "ffprobe must be installed to run integration tests"
+        assert (
+            check_ffprobe_installed() is True
+        ), "ffprobe must be installed to run integration tests"
 
     def test_can_get_ffmpeg_version(self):
         """Test that we can get the actual FFmpeg version."""

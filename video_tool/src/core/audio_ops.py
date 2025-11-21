@@ -51,7 +51,7 @@ def extract_audio(
     Example:
         >>> # Extract audio without re-encoding
         >>> extract_audio("movie.mp4", "audio.m4a", codec="copy")
-        
+
         >>> # Extract and convert to MP3 at 192kbps
         >>> extract_audio("movie.mp4", "audio.mp3", codec="mp3", bitrate="192k")
     """
@@ -73,7 +73,8 @@ def extract_audio(
 
     # Build FFmpeg command
     args = [
-        "-i", input_path,
+        "-i",
+        input_path,
         "-vn",  # No video
     ]
 
@@ -84,7 +85,7 @@ def extract_audio(
     else:
         # Re-encode audio
         args.extend(["-acodec", codec])
-        
+
         if bitrate:
             args.extend(["-b:a", bitrate])
             logger.info(f"Re-encoding to {codec} at {bitrate}")
@@ -149,7 +150,7 @@ def replace_audio(
     Example:
         >>> # Replace audio without re-encoding
         >>> replace_audio("video.mp4", "new_audio.m4a", "output.mp4")
-        
+
         >>> # Replace audio with re-encoding
         >>> replace_audio("video.mp4", "audio.mp3", "output.mp4", copy_codecs=False)
     """
@@ -170,34 +171,51 @@ def replace_audio(
 
     # Build FFmpeg command
     args = [
-        "-i", video_path,  # Video input
-        "-i", audio_path,  # Audio input
+        "-i",
+        video_path,  # Video input
+        "-i",
+        audio_path,  # Audio input
     ]
 
     if copy_codecs:
         # Copy codecs without re-encoding
-        args.extend([
-            "-c:v", "copy",  # Copy video codec
-            "-c:a", "copy",  # Copy audio codec
-        ])
+        args.extend(
+            [
+                "-c:v",
+                "copy",  # Copy video codec
+                "-c:a",
+                "copy",  # Copy audio codec
+            ]
+        )
         logger.info("Using codec copy mode (no re-encoding)")
     else:
         # Re-encode both video and audio
-        args.extend([
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-crf", "23",
-            "-c:a", "aac",
-            "-b:a", "128k",
-        ])
+        args.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "23",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+            ]
+        )
         logger.info("Using re-encoding mode")
 
     # Map streams: video from first input, audio from second input
-    args.extend([
-        "-map", "0:v:0",  # Map video from first input
-        "-map", "1:a:0",  # Map audio from second input
-        "-shortest",  # End output at shortest input duration
-    ])
+    args.extend(
+        [
+            "-map",
+            "0:v:0",  # Map video from first input
+            "-map",
+            "1:a:0",  # Map audio from second input
+            "-shortest",  # End output at shortest input duration
+        ]
+    )
 
     args.append(output_path)
 
@@ -276,11 +294,16 @@ def mix_audio_tracks(
         filter_str += f"[{i}:a]"
     filter_str += f"amix=inputs={len(audio_files)}:duration=longest"
 
-    args.extend([
-        "-filter_complex", filter_str,
-        "-c:a", codec,
-        "-b:a", bitrate,
-    ])
+    args.extend(
+        [
+            "-filter_complex",
+            filter_str,
+            "-c:a",
+            codec,
+            "-b:a",
+            bitrate,
+        ]
+    )
 
     args.append(output_path)
 

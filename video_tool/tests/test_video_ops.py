@@ -48,9 +48,7 @@ class TestCutByDuration:
             (output_dir / f"part_{i:03d}.mp4").write_text("segment")
 
         # Call function
-        segments = cut_by_duration(
-            "input.mp4", str(output_dir), segment_duration=40, prefix="part"
-        )
+        segments = cut_by_duration("input.mp4", str(output_dir), segment_duration=40, prefix="part")
 
         # Verify
         assert len(segments) == 3
@@ -234,9 +232,7 @@ class TestCutByTimestamps:
         for i in range(1, 4):
             (output_dir / f"clip_{i:03d}.mp4").write_text("segment")
 
-        segments = cut_by_timestamps(
-            "input.mp4", str(output_dir), timestamps, prefix="clip"
-        )
+        segments = cut_by_timestamps("input.mp4", str(output_dir), timestamps, prefix="clip")
 
         assert len(segments) == 3
         assert mock_ffmpeg.call_count == 3  # One call per segment
@@ -554,14 +550,14 @@ class TestProfileBasedReEncoding:
     ):
         """Test that cut_by_duration uses specified profile for re-encoding."""
         from core.profiles import Profile
-        
+
         # Setup mocks
         mock_validate.return_value = True
         mock_video_info.return_value = {"duration": 60.0}
         mock_file_size.return_value = 1024 * 1024
         mock_check_space.return_value = True
         mock_ffmpeg.return_value = {"success": True, "returncode": 0}
-        
+
         # Mock profile
         mock_profile = Profile(
             name="test_720p",
@@ -575,11 +571,11 @@ class TestProfileBasedReEncoding:
             crf=None,
         )
         mock_get_profile.return_value = mock_profile
-        
+
         output_dir = tmp_path / "output"
         output_dir.mkdir()
         (output_dir / "part_001.mp4").write_text("segment")
-        
+
         # Call with profile
         cut_by_duration(
             "input.mp4",
@@ -588,10 +584,10 @@ class TestProfileBasedReEncoding:
             copy_codec=False,
             profile_name="test_720p",
         )
-        
+
         # Verify profile was loaded
         mock_get_profile.assert_called_once_with("test_720p")
-        
+
         # Verify FFmpeg was called with profile settings
         call_args = mock_ffmpeg.call_args[0][0]
         assert "-c:v" in call_args
@@ -619,10 +615,10 @@ class TestProfileBasedReEncoding:
     ):
         """Test that cut_by_timestamps uses specified profile for re-encoding."""
         from core.profiles import Profile
-        
+
         mock_validate.return_value = True
         mock_ffmpeg.return_value = {"success": True, "returncode": 0}
-        
+
         mock_profile = Profile(
             name="web_480p",
             description="Web profile",
@@ -635,11 +631,11 @@ class TestProfileBasedReEncoding:
             audio_bitrate="96k",
         )
         mock_get_profile.return_value = mock_profile
-        
+
         output_dir = tmp_path / "output"
         output_dir.mkdir()
         (output_dir / "clip_001.mp4").write_text("segment")
-        
+
         cut_by_timestamps(
             "input.mp4",
             str(output_dir),
@@ -648,7 +644,7 @@ class TestProfileBasedReEncoding:
             prefix="clip",
             profile_name="web_480p",
         )
-        
+
         # Verify profile settings in FFmpeg args
         call_args = mock_ffmpeg.call_args[0][0]
         assert "libx264" in call_args
@@ -678,12 +674,12 @@ class TestProfileBasedReEncoding:
     ):
         """Test that concat_videos uses specified profile for re-encoding."""
         from core.profiles import Profile
-        
+
         mock_validate.return_value = True
         mock_video_info.return_value = {"codec": "h264", "width": 1920, "height": 1080}
         mock_temp_filename.return_value = str(tmp_path / "concat.txt")
         mock_ffmpeg.return_value = {"success": True, "returncode": 0}
-        
+
         mock_profile = Profile(
             name="movie_1080p",
             description="Movie profile",
@@ -694,17 +690,17 @@ class TestProfileBasedReEncoding:
             audio_bitrate="192k",
         )
         mock_get_profile.return_value = mock_profile
-        
+
         output_file = tmp_path / "output.mp4"
         output_file.write_text("video")
-        
+
         concat_videos(
             ["video1.mp4", "video2.mp4"],
             str(output_file),
             copy_codec=False,
             profile_name="movie_1080p",
         )
-        
+
         # Verify profile was used
         call_args = mock_ffmpeg.call_args[0][0]
         assert "hevc_videotoolbox" in call_args
@@ -731,18 +727,18 @@ class TestProfileBasedReEncoding:
     ):
         """Test that invalid profile name raises appropriate error."""
         from core.profiles import ProfileNotFoundError
-        
+
         mock_validate.return_value = True
         mock_video_info.return_value = {"duration": 60.0}
         mock_file_size.return_value = 1024 * 1024
         mock_check_space.return_value = True
-        
+
         # Mock profile not found
         mock_get_profile.side_effect = ProfileNotFoundError("Profile 'invalid' not found")
-        
+
         output_dir = tmp_path / "output"
         output_dir.mkdir()
-        
+
         # Should raise InvalidInputError
         with pytest.raises(InvalidInputError) as exc_info:
             cut_by_duration(
@@ -752,5 +748,5 @@ class TestProfileBasedReEncoding:
                 copy_codec=False,
                 profile_name="invalid",
             )
-        
+
         assert "not found" in str(exc_info.value).lower()
