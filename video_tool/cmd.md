@@ -144,6 +144,24 @@ video-tool cut -i movie.mp4 -o ./output -d 11 --no-copy --profile web_720p
 - For 480p or lower, use software profiles (web_480p, mobile_480p)
 - Re-encoding takes longer but reduces file size 20-30%
 
+#### With Job Tracking ✅ NEW
+```bash
+# Enable job tracking for monitoring and history
+video-tool cut -i movie.mp4 -o ./output -d 11 --track-job
+
+# View job status
+video-tool jobs list
+
+# View job details
+video-tool jobs show 1
+```
+
+**Benefits:**
+- Track job history
+- Monitor progress
+- Retry failed operations
+- Audit trail
+
 #### Example với Video thực tế
 ```bash
 # Cut video 39 phút thành 11-minute segments (sẽ có 4 segments)
@@ -351,6 +369,123 @@ video-tool audio replace \
 # Step 3: Verify
 video-tool info -i video_with_new_audio.mp4
 ```
+
+---
+
+## 📊 JOB MANAGEMENT
+
+### List Jobs
+```bash
+# List all jobs
+video-tool jobs list
+
+# Filter by status
+video-tool jobs list --status completed
+video-tool jobs list --status failed
+video-tool jobs list --status running
+
+# Limit results
+video-tool jobs list --limit 50
+```
+
+**Output Example:**
+```
+📋 Jobs (3)
+
+┌────┬──────┬─────────────┬──────────┬──────────────────┬──────────┐
+│ ID │ Type │ Status      │ Progress │ Created          │ Duration │
+├────┼──────┼─────────────┼──────────┼──────────────────┼──────────┤
+│ 3  │ cut  │ ✓ completed │ 100%     │ 2025-11-21 10:04 │ 8.5m     │
+│ 2  │ cut  │ ✗ failed    │ 0%       │ 2025-11-21 09:52 │ 0s       │
+│ 1  │ cut  │ ✓ completed │ 100%     │ 2025-11-21 09:30 │ 0.4s     │
+└────┴──────┴─────────────┴──────────┴──────────────────┴──────────┘
+```
+
+### Show Job Details
+```bash
+video-tool jobs show 1
+```
+
+**Output Example:**
+```
+📋 Job #1
+
+ Type          cut
+ Status        ✓ completed
+ Progress      100.0%
+ Created       2025-11-21 10:04:31
+ Started       2025-11-21 10:04:31
+ Completed     2025-11-21 10:04:31
+ Duration      0.4s
+ Input Files   1 file(s)
+                 1. test_video_30s.mp4
+ Output Files  1 file(s)
+                 1. test_job_output/test_001.mp4
+ Config        {
+                 "segment_duration": 60,
+                 "copy_codec": true,
+                 "prefix": "test"
+               }
+```
+
+### View Job Logs
+```bash
+video-tool jobs logs 1
+```
+
+**Output Example:**
+```
+📝 Logs for Job #1 (3 entries)
+
+┌──────────┬───────┬────────────────────────────────────┐
+│ Time     │ Level │ Message                            │
+├──────────┼───────┼────────────────────────────────────┤
+│ 10:04:31 │ INFO  │ Job created: cut                   │
+│ 10:04:31 │ INFO  │ Status updated: running            │
+│ 10:04:31 │ INFO  │ Status updated: completed (100.0%) │
+└──────────┴───────┴────────────────────────────────────┘
+```
+
+### Retry Failed Job
+```bash
+video-tool jobs retry 2
+```
+
+**Output:**
+```
+🔄 Retrying Job #2
+Type: cut
+Previous error: FFmpeg command failed
+
+✅ Job 2 reset to pending status.
+
+⚠️  Note: Job will need to be executed manually with the original command.
+```
+
+### Clean Up Old Jobs
+```bash
+# Clean jobs older than 30 days (default)
+video-tool jobs clean
+
+# Clean jobs older than 90 days
+video-tool jobs clean --older-than 90
+
+# Skip confirmation prompt
+video-tool jobs clean --force
+```
+
+**Output:**
+```
+🧹 Cleaning up old jobs...
+
+✅ Removed 15 old job(s).
+```
+
+### Job Status Symbols
+- ✓ **completed** - Job finished successfully
+- ✗ **failed** - Job failed with error
+- ▶ **running** - Job currently executing
+- ○ **pending** - Job waiting to start
 
 ---
 
