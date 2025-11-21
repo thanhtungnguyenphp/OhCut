@@ -1,7 +1,7 @@
 # Core Dependencies
 typer[all]==0.9.0           # CLI framework with rich support
 rich==13.7.0                # Beautiful console output
-pydantic==2.5.3             # Data validation
+pydantic>=2.6.0             # Data validation (Python 3.14 compatible)
 pyyaml==6.0.1               # YAML configuration files
 
 # Testing
