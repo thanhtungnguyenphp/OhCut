@@ -73,6 +73,7 @@ test_reencode/
 *.db
 *.sqlite
 *.sqlite3
+jobs.db*
 
 # Configuration (if contains secrets)
 .env
