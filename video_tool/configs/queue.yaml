@@ -1,0 +1,12 @@
+queue:
+  max_workers: 2
+  check_interval: 5  # seconds between queue checks
+  retry_failed_jobs: true
+  max_retries: 3
+  retry_delay: 300  # 5 minutes
+
+worker:
+  timeout: 3600  # 1 hour max per job
+  log_level: INFO
+  enable_progress_callback: true
+  pid_file: ".worker_pool.pid"

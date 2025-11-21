@@ -32,10 +32,12 @@ app = typer.Typer(
 audio_app = typer.Typer(help="Audio operations")
 profiles_app = typer.Typer(help="Profile management")
 jobs_app = typer.Typer(help="Job management")
+worker_app = typer.Typer(help="Worker management")
 
 app.add_typer(audio_app, name="audio")
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(jobs_app, name="jobs")
+app.add_typer(worker_app, name="worker")
 
 # Rich console for output
 console = Console()
@@ -94,6 +96,9 @@ def cut(
     track_job: bool = typer.Option(
         False, "--track-job", help="Track job in database for history and monitoring"
     ),
+    async_mode: bool = typer.Option(
+        False, "--async", help="Submit job to queue for background processing"
+    ),
 ):
     """
     Cut video into segments by duration.
@@ -133,7 +138,41 @@ def cut(
 
         return
 
-    # Execute cut
+    # Handle async mode
+    if async_mode:
+        try:
+            db = Database()
+            job_id = db.create_job(
+                job_type="cut",
+                input_files=[input],
+                config={
+                    "output_dir": output_dir,
+                    "segment_duration": duration * 60,
+                    "copy_codec": not no_copy,
+                    "prefix": prefix,
+                    "profile_name": profile,
+                },
+            )
+
+            console.print(f"\n[green]✅ Job submitted successfully![/green]")
+            console.print(f"Job ID: [cyan]{job_id}[/cyan]")
+            console.print(f"\nTo monitor progress:")
+            console.print(f"  video-tool jobs show {job_id}")
+            console.print(f"  video-tool jobs logs {job_id}")
+            console.print(
+                f"\n[yellow]Note: Make sure workers are running with 'video-tool worker start'[/yellow]\n"
+            )
+
+        except Exception as e:
+            console.print(f"\n[red]❌ Error submitting job: {e}[/red]")
+            if state.verbose:
+                import traceback
+
+                console.print(traceback.format_exc())
+            raise typer.Exit(code=1)
+        return
+
+    # Execute cut synchronously
     try:
         with Progress(
             SpinnerColumn(),
@@ -189,6 +228,9 @@ def concat(
     profile: Optional[str] = typer.Option(
         None, "--profile", help="Encoding profile to use (if re-encoding)"
     ),
+    async_mode: bool = typer.Option(
+        False, "--async", help="Submit job to queue for background processing"
+    ),
 ):
     """
     Concatenate multiple videos into one.
@@ -213,7 +255,40 @@ def concat(
         console.print(f"\nWould concatenate {len(inputs)} files into: {output}")
         return
 
-    # Execute concat
+    # Handle async mode
+    if async_mode:
+        try:
+            db = Database()
+            job_id = db.create_job(
+                job_type="concat",
+                input_files=list(inputs),
+                config={
+                    "output_path": output,
+                    "copy_codec": not no_copy,
+                    "validate_compatibility": not no_validate,
+                    "profile_name": profile,
+                },
+            )
+
+            console.print(f"\n[green]✅ Job submitted successfully![/green]")
+            console.print(f"Job ID: [cyan]{job_id}[/cyan]")
+            console.print(f"\nTo monitor progress:")
+            console.print(f"  video-tool jobs show {job_id}")
+            console.print(f"  video-tool jobs logs {job_id}")
+            console.print(
+                f"\n[yellow]Note: Make sure workers are running with 'video-tool worker start'[/yellow]\n"
+            )
+
+        except Exception as e:
+            console.print(f"\n[red]❌ Error submitting job: {e}[/red]")
+            if state.verbose:
+                import traceback
+
+                console.print(traceback.format_exc())
+            raise typer.Exit(code=1)
+        return
+
+    # Execute concat synchronously
     try:
         with console.status("[bold green]Concatenating videos..."):
             video_ops.concat_videos(
@@ -820,6 +895,207 @@ def jobs_clean(
 
             console.print(traceback.format_exc())
         raise typer.Exit(code=1)
+
+
+# ============================================================================
+# Worker Commands
+# ============================================================================
+
+
+@worker_app.command("start")
+def worker_start(
+    workers: int = typer.Option(2, "--workers", "-w", help="Number of worker processes"),
+    check_interval: int = typer.Option(
+        5, "--check-interval", help="Queue check interval in seconds"
+    ),
+):
+    """
+    Start worker pool for background job processing.
+
+    Workers will run in foreground and process pending jobs from the queue.
+    Press Ctrl+C to stop workers gracefully.
+
+    Example:
+        video-tool worker start
+        video-tool worker start --workers 4
+    """
+    try:
+        from core.queue import WorkerPool
+
+        # Check if already running
+        if os.path.exists(".worker_pool.pid"):
+            try:
+                with open(".worker_pool.pid", "r") as f:
+                    pid = int(f.read().strip())
+                # Check if process exists
+                os.kill(pid, 0)
+                console.print(f"\n[yellow]⚠ Worker pool already running (PID: {pid})[/yellow]")
+                console.print("Use 'video-tool worker stop' to stop it first.\n")
+                raise typer.Exit(code=1)
+            except (OSError, ValueError):
+                # Process doesn't exist, remove stale PID file
+                os.remove(".worker_pool.pid")
+
+        console.print(f"\n[bold cyan]🚀 Starting Worker Pool[/bold cyan]")
+        console.print(f"Workers: {workers}")
+        console.print(f"Check interval: {check_interval}s")
+        console.print("\nPress Ctrl+C to stop workers gracefully.\n")
+
+        pool = WorkerPool(num_workers=workers, check_interval=check_interval)
+        pool.start()
+
+        # Keep running until interrupted
+        import time
+
+        try:
+            while pool.is_running():
+                time.sleep(1)
+        except KeyboardInterrupt:
+            console.print("\n\n[yellow]⏹ Stopping workers...[/yellow]")
+            pool.stop()
+            console.print("[green]✅ Workers stopped successfully.[/green]\n")
+
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@worker_app.command("stop")
+def worker_stop():
+    """
+    Stop running worker pool.
+
+    Sends SIGTERM to worker pool process for graceful shutdown.
+
+    Example:
+        video-tool worker stop
+    """
+    try:
+        if not os.path.exists(".worker_pool.pid"):
+            console.print("\n[yellow]No worker pool running.[/yellow]\n")
+            return
+
+        with open(".worker_pool.pid", "r") as f:
+            pid = int(f.read().strip())
+
+        console.print(f"\n[bold cyan]⏹ Stopping Worker Pool[/bold cyan]")
+        console.print(f"PID: {pid}\n")
+
+        # Send SIGTERM for graceful shutdown
+        import signal
+
+        os.kill(pid, signal.SIGTERM)
+
+        # Wait for shutdown
+        import time
+
+        for i in range(30):
+            try:
+                os.kill(pid, 0)
+                time.sleep(1)
+            except OSError:
+                break
+
+        # Check if still running
+        try:
+            os.kill(pid, 0)
+            console.print("[yellow]⚠ Worker pool didn't stop, sending SIGKILL...[/yellow]")
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+        console.print("[green]✅ Worker pool stopped.[/green]\n")
+
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@worker_app.command("status")
+def worker_status():
+    """
+    Show worker pool status.
+
+    Displays worker pool and individual worker information.
+
+    Example:
+        video-tool worker status
+    """
+    try:
+        if not os.path.exists(".worker_pool.pid"):
+            console.print("\n[yellow]No worker pool running.[/yellow]\n")
+            return
+
+        with open(".worker_pool.pid", "r") as f:
+            pid = int(f.read().strip())
+
+        # Check if process exists
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            console.print("\n[yellow]Worker pool PID file exists but process not running.[/yellow]")
+            console.print("Removing stale PID file...\n")
+            os.remove(".worker_pool.pid")
+            return
+
+        console.print(f"\n[bold cyan]📊 Worker Pool Status[/bold cyan]")
+        console.print(f"PID: {pid}")
+        console.print(f"Status: [green]Running[/green]\n")
+
+        # Get job statistics
+        from core.database import Database, JobStatus
+
+        db = Database()
+
+        pending_jobs = len(db.list_jobs(status=JobStatus.PENDING, limit=1000))
+        running_jobs = len(db.list_jobs(status=JobStatus.RUNNING, limit=1000))
+
+        console.print(f"[bold]Queue Statistics:[/bold]")
+        console.print(f"  Pending jobs: {pending_jobs}")
+        console.print(f"  Running jobs: {running_jobs}")
+        console.print()
+
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@worker_app.command("restart")
+def worker_restart(
+    workers: int = typer.Option(2, "--workers", "-w", help="Number of worker processes"),
+):
+    """
+    Restart worker pool.
+
+    Stops running workers and starts new ones.
+
+    Example:
+        video-tool worker restart
+        video-tool worker restart --workers 4
+    """
+    console.print("\n[bold cyan]🔄 Restarting Worker Pool[/bold cyan]\n")
+
+    # Stop if running
+    if os.path.exists(".worker_pool.pid"):
+        worker_stop()
+        import time
+
+        time.sleep(2)
+
+    # Start new pool
+    worker_start(workers=workers)
 
 
 @app.command()

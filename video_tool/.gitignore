@@ -75,6 +75,9 @@ test_reencode/
 *.sqlite3
 jobs.db*
 
+# Worker pool
+.worker_pool.pid
+
 # Configuration (if contains secrets)
 .env
 .env.local
