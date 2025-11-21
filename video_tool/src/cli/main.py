@@ -18,6 +18,7 @@ from rich import print as rprint
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.core import ffmpeg_runner, video_ops, audio_ops, profiles
+from src.core.database import Database, JobStatus
 from src.utils import file_utils
 
 # Initialize Typer app
@@ -30,9 +31,11 @@ app = typer.Typer(
 # Create subcommands
 audio_app = typer.Typer(help="Audio operations")
 profiles_app = typer.Typer(help="Profile management")
+jobs_app = typer.Typer(help="Job management")
 
 app.add_typer(audio_app, name="audio")
 app.add_typer(profiles_app, name="profiles")
+app.add_typer(jobs_app, name="jobs")
 
 # Rich console for output
 console = Console()
@@ -439,6 +442,329 @@ def profiles_show(
         console.print(f"\n[red]❌ {e}[/red]")
         console.print("\nUse 'video-tool profiles list' to see available profiles.")
         raise typer.Exit(code=1)
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@jobs_app.command("list")
+def jobs_list(
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status (pending, running, completed, failed)"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Maximum number of jobs to show"),
+):
+    """
+    List jobs with optional status filter.
+    
+    Example:
+        video-tool jobs list
+        video-tool jobs list --status failed
+        video-tool jobs list --limit 50
+    """
+    try:
+        db = Database()
+        
+        # Parse status if provided
+        status_filter = None
+        if status:
+            try:
+                status_filter = JobStatus(status.lower())
+            except ValueError:
+                console.print(f"[red]❌ Invalid status: {status}[/red]")
+                console.print("Valid statuses: pending, running, completed, failed")
+                raise typer.Exit(code=1)
+        
+        jobs = db.list_jobs(status=status_filter, limit=limit)
+        
+        if not jobs:
+            console.print("\n[yellow]No jobs found.[/yellow]\n")
+            return
+        
+        # Create table
+        title = f"Jobs ({len(jobs)}"
+        if status_filter:
+            title += f", status: {status}"
+        title += ")"
+        
+        console.print(f"\n[bold cyan]📋 {title}[/bold cyan]\n")
+        
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("ID", style="cyan", no_wrap=True)
+        table.add_column("Type", style="blue")
+        table.add_column("Status", style="white")
+        table.add_column("Progress", style="green")
+        table.add_column("Created", style="yellow")
+        table.add_column("Duration", style="magenta")
+        
+        for job in jobs:
+            # Color code status
+            if job.status == JobStatus.COMPLETED:
+                status_text = "[green]✓ completed[/green]"
+            elif job.status == JobStatus.FAILED:
+                status_text = "[red]✗ failed[/red]"
+            elif job.status == JobStatus.RUNNING:
+                status_text = "[yellow]▶ running[/yellow]"
+            else:
+                status_text = "[dim]○ pending[/dim]"
+            
+            # Calculate duration
+            duration_text = "-"
+            if job.completed_at and job.started_at:
+                duration_sec = (job.completed_at - job.started_at).total_seconds()
+                if duration_sec < 60:
+                    duration_text = f"{duration_sec:.0f}s"
+                elif duration_sec < 3600:
+                    duration_text = f"{duration_sec / 60:.1f}m"
+                else:
+                    duration_text = f"{duration_sec / 3600:.1f}h"
+            elif job.started_at:
+                duration_text = "running..."
+            
+            table.add_row(
+                str(job.id),
+                job.job_type,
+                status_text,
+                f"{job.progress:.0f}%",
+                job.created_at.strftime("%Y-%m-%d %H:%M"),
+                duration_text,
+            )
+        
+        console.print(table)
+        console.print()
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@jobs_app.command("show")
+def jobs_show(
+    job_id: int = typer.Argument(..., help="Job ID"),
+):
+    """
+    Show detailed information about a specific job.
+    
+    Example:
+        video-tool jobs show 1
+    """
+    try:
+        db = Database()
+        job = db.get_job(job_id)
+        
+        if not job:
+            console.print(f"\n[red]❌ Job {job_id} not found.[/red]\n")
+            raise typer.Exit(code=1)
+        
+        console.print(f"\n[bold cyan]📋 Job #{job.id}[/bold cyan]\n")
+        
+        # Create details table
+        table = Table(show_header=False, box=None)
+        table.add_column("Property", style="bold cyan", no_wrap=True)
+        table.add_column("Value", style="white")
+        
+        # Status with color
+        if job.status == JobStatus.COMPLETED:
+            status_text = "[green]✓ completed[/green]"
+        elif job.status == JobStatus.FAILED:
+            status_text = "[red]✗ failed[/red]"
+        elif job.status == JobStatus.RUNNING:
+            status_text = "[yellow]▶ running[/yellow]"
+        else:
+            status_text = "[dim]○ pending[/dim]"
+        
+        table.add_row("Type", job.job_type)
+        table.add_row("Status", status_text)
+        table.add_row("Progress", f"{job.progress:.1f}%")
+        table.add_row("Created", job.created_at.strftime("%Y-%m-%d %H:%M:%S"))
+        
+        if job.started_at:
+            table.add_row("Started", job.started_at.strftime("%Y-%m-%d %H:%M:%S"))
+        
+        if job.completed_at:
+            table.add_row("Completed", job.completed_at.strftime("%Y-%m-%d %H:%M:%S"))
+            duration_sec = (job.completed_at - job.started_at).total_seconds()
+            table.add_row("Duration", f"{duration_sec:.1f}s")
+        
+        if job.retry_count > 0:
+            table.add_row("Retries", str(job.retry_count))
+        
+        table.add_row("Input Files", f"{len(job.input_files)} file(s)")
+        for i, f in enumerate(job.input_files, 1):
+            table.add_row("", f"  {i}. {f}")
+        
+        if job.output_files:
+            table.add_row("Output Files", f"{len(job.output_files)} file(s)")
+            for i, f in enumerate(job.output_files, 1):
+                table.add_row("", f"  {i}. {f}")
+        
+        if job.config:
+            import json
+            config_str = json.dumps(job.config, indent=2)
+            table.add_row("Config", config_str)
+        
+        if job.error_message:
+            table.add_row("Error", f"[red]{job.error_message}[/red]")
+        
+        console.print(table)
+        console.print()
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@jobs_app.command("logs")
+def jobs_logs(
+    job_id: int = typer.Argument(..., help="Job ID"),
+):
+    """
+    Show log entries for a specific job.
+    
+    Example:
+        video-tool jobs logs 1
+    """
+    try:
+        db = Database()
+        job = db.get_job(job_id)
+        
+        if not job:
+            console.print(f"\n[red]❌ Job {job_id} not found.[/red]\n")
+            raise typer.Exit(code=1)
+        
+        logs = db.get_job_logs(job_id)
+        
+        if not logs:
+            console.print(f"\n[yellow]No logs found for job {job_id}.[/yellow]\n")
+            return
+        
+        console.print(f"\n[bold cyan]📝 Logs for Job #{job_id} ({len(logs)} entries)[/bold cyan]\n")
+        
+        # Create logs table
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Time", style="yellow", no_wrap=True)
+        table.add_column("Level", style="blue", no_wrap=True)
+        table.add_column("Message", style="white")
+        
+        for log in logs:
+            # Color code log level
+            level = log['level']
+            if level == 'ERROR':
+                level_text = "[red]ERROR[/red]"
+            elif level == 'WARNING':
+                level_text = "[yellow]WARN[/yellow]"
+            else:
+                level_text = "[green]INFO[/green]"
+            
+            # Parse timestamp
+            from datetime import datetime
+            try:
+                ts = datetime.fromisoformat(log['timestamp'])
+                time_str = ts.strftime("%H:%M:%S")
+            except:
+                time_str = log['timestamp']
+            
+            table.add_row(
+                time_str,
+                level_text,
+                log['message'],
+            )
+        
+        console.print(table)
+        console.print()
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@jobs_app.command("retry")
+def jobs_retry(
+    job_id: int = typer.Argument(..., help="Job ID"),
+):
+    """
+    Retry a failed job.
+    
+    Example:
+        video-tool jobs retry 1
+    """
+    try:
+        db = Database()
+        job = db.get_job(job_id)
+        
+        if not job:
+            console.print(f"\n[red]❌ Job {job_id} not found.[/red]\n")
+            raise typer.Exit(code=1)
+        
+        if job.status != JobStatus.FAILED:
+            console.print(f"\n[yellow]⚠ Job {job_id} is not in failed status (current: {job.status.value}).[/yellow]\n")
+            console.print("Only failed jobs can be retried.")
+            raise typer.Exit(code=1)
+        
+        console.print(f"\n[bold cyan]🔄 Retrying Job #{job_id}[/bold cyan]")
+        console.print(f"Type: {job.job_type}")
+        console.print(f"Previous error: {job.error_message}")
+        console.print()
+        
+        # Reset job status
+        db.increment_retry_count(job_id)
+        db.update_job_status(job_id, JobStatus.PENDING, progress=0.0)
+        
+        console.print(f"[green]✅ Job {job_id} reset to pending status.[/green]")
+        console.print("\n[yellow]Note: Job will need to be executed manually with the original command.[/yellow]\n")
+    
+    except Exception as e:
+        console.print(f"\n[red]❌ Error: {e}[/red]")
+        if state.verbose:
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(code=1)
+
+
+@jobs_app.command("clean")
+def jobs_clean(
+    older_than: int = typer.Option(30, "--older-than", "-d", help="Remove completed jobs older than N days"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+):
+    """
+    Clean up old completed jobs from the database.
+    
+    Example:
+        video-tool jobs clean
+        video-tool jobs clean --older-than 90
+        video-tool jobs clean --force
+    """
+    try:
+        db = Database()
+        
+        if not force:
+            confirm = typer.confirm(
+                f"\nRemove completed jobs older than {older_than} days?",
+                abort=True
+            )
+        
+        console.print(f"\n[bold cyan]🧹 Cleaning up old jobs...[/bold cyan]\n")
+        
+        deleted_count = db.cleanup_old_jobs(days=older_than)
+        
+        if deleted_count > 0:
+            console.print(f"[green]✅ Removed {deleted_count} old job(s).[/green]\n")
+        else:
+            console.print(f"[yellow]No jobs found older than {older_than} days.[/yellow]\n")
+    
+    except typer.Abort:
+        console.print("\n[yellow]Cancelled.[/yellow]\n")
     
     except Exception as e:
         console.print(f"\n[red]❌ Error: {e}[/red]")
