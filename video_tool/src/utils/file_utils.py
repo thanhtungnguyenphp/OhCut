@@ -100,8 +100,10 @@ def get_video_info(path: str) -> Dict[str, any]:
 
     # Run ffprobe to get video info in JSON format
     args = [
-        "-v", "error",  # Only show errors
-        "-print_format", "json",  # Output as JSON
+        "-v",
+        "error",  # Only show errors
+        "-print_format",
+        "json",  # Output as JSON
         "-show_format",  # Show format info
         "-show_streams",  # Show stream info
         path,
@@ -158,8 +160,10 @@ def get_video_info(path: str) -> Dict[str, any]:
     else:
         info["audio_codec"] = "none"
 
-    logger.info(f"Video info extracted: {path} - {info['duration']}s, "
-                f"{info['width']}x{info['height']}, {info['codec']}")
+    logger.info(
+        f"Video info extracted: {path} - {info['duration']}s, "
+        f"{info['width']}x{info['height']}, {info['codec']}"
+    )
 
     return info
 
@@ -367,6 +371,6 @@ def get_safe_filename(filename: str) -> str:
     # Limit filename length (255 is max on most systems, leave room for path)
     if len(safe_name) > 200:
         name, ext = os.path.splitext(safe_name)
-        safe_name = name[:200 - len(ext)] + ext
+        safe_name = name[: 200 - len(ext)] + ext
 
     return safe_name

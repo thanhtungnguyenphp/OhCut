@@ -57,11 +57,23 @@ temp/
 # Output files (for testing)
 test_output/
 output/
+test_reencode/
+
+# Test video/audio files (large)
+*.mp4
+*.m4a
+*.mkv
+*.avi
+*.mov
+*.opus
+*.flac
+*.wav
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+jobs.db*
 
 # Configuration (if contains secrets)
 .env

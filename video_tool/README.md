@@ -38,6 +38,14 @@ A powerful Python-based command-line tool for automated video and audio processi
 - ✅ Custom log file support
 - ✅ Color-coded output with emojis
 
+### Job Tracking & History
+- ✅ SQLite-based job tracking system
+- ✅ Job history with status and progress
+- ✅ Retry failed operations
+- ✅ View job logs and details
+- ✅ Clean up old completed jobs
+- ✅ Optional tracking with --track-job flag
+
 ### Logging & Monitoring
 - ✅ Rich console logging with colors and tracebacks
 - ✅ Rotating file logs (10MB, 5 backups)
@@ -167,7 +175,31 @@ video-tool profiles show movie_1080p
 
 Displays detailed information about a specific profile.
 
-### 8. Show Version
+### 8. Job Management
+
+```bash
+# Track job during processing
+video-tool cut -i movie.mp4 -o ./output -d 11 --track-job
+
+# List all jobs
+video-tool jobs list
+
+# Show job details
+video-tool jobs show 1
+
+# View job logs
+video-tool jobs logs 1
+
+# Retry failed job
+video-tool jobs retry 1
+
+# Clean up old jobs
+video-tool jobs clean --older-than 30
+```
+
+Enables job tracking and history for monitoring and debugging.
+
+### 9. Show Version
 
 ```bash
 video-tool version
@@ -262,9 +294,58 @@ video-tool profiles list
 # View profile details
 video-tool profiles show web_720p
 
-# Cut and re-encode using profile (Phase 2 feature)
-# video-tool cut -i movie.mp4 -o ./clips --no-copy --profile web_720p
+# Cut and re-encode using profile
+video-tool cut -i movie.mp4 -o ./clips -d 11 --no-copy --profile clip_720p
+
+# Concat with re-encoding and profile
+video-tool concat -i part1.mp4 -i part2.mp4 -o final.mp4 --no-copy --profile web_720p
 ```
+
+**Re-encoding Performance:**
+- Hardware acceleration (HEVC): ~4-5x realtime speed
+- Software encoding (H.264): ~2-3x realtime speed
+- Size reduction: 20-30% smaller with maintained quality
+
+**Example Output:**
+```bash
+# Input: 876 MB, 39:26 duration, 1280x720 H.264
+# Output (clip_720p): 672 MB (23% smaller), 1280x720 HEVC
+# Encoding time: ~8 minutes (4.3x realtime)
+```
+
+### Example 5: Job Tracking for Long Operations
+
+```bash
+# Enable job tracking for monitoring
+video-tool cut -i large_movie.mp4 -o ./output -d 11 --track-job
+
+# View job progress
+video-tool jobs list
+
+# Output:
+# 📋 Jobs (1)
+# ┌────┬──────┬─────────────┬──────────┬──────────────────┬──────────┐
+# │ ID │ Type │ Status      │ Progress │ Created          │ Duration │
+# ├────┼──────┼─────────────┼──────────┼──────────────────┼──────────┤
+# │ 1  │ cut  │ ✓ completed │ 100%     │ 2025-11-21 10:04 │ 8.5m     │
+# └────┴──────┴─────────────┴──────────┴──────────────────┴──────────┘
+
+# View detailed job information
+video-tool jobs show 1
+
+# View job logs
+video-tool jobs logs 1
+
+# If job failed, retry it
+video-tool jobs retry 1
+```
+
+**Benefits:**
+- Track job history and status
+- Monitor progress of long-running operations
+- Retry failed jobs without re-entering commands
+- Audit trail for all operations
+- Debug failures with job logs
 
 ## Troubleshooting
 
@@ -398,8 +479,9 @@ flake8 src/
 - ✅ Unit and integration tests (~75% coverage)
 - ✅ Documentation (README + CONTRIBUTING)
 
-### Phase 2: Production-Ready (Planned)
-- [ ] Re-encoding with profile support
+### Phase 2: Production-Ready 🚧 IN PROGRESS
+- ✅ Re-encoding with profile support (Task 2.1 complete)
+- ✅ Hardware acceleration (VideoToolbox on macOS)
 - [ ] Job queue for batch processing
 - [ ] Web UI for visual workflow management
 - [ ] REST API for programmatic access

@@ -295,7 +295,7 @@ class TestDiskSpace:
         """Test that check_disk_space raises error with insufficient space."""
         # Try to check for impossibly large space
         with pytest.raises(InsufficientDiskSpaceError) as exc_info:
-            check_disk_space(10 ** 18, buffer_gb=0)  # 1 exabyte
+            check_disk_space(10**18, buffer_gb=0)  # 1 exabyte
         assert "Insufficient disk space" in str(exc_info.value)
 
 
