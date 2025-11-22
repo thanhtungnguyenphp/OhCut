@@ -46,6 +46,14 @@ A powerful Python-based command-line tool for automated video and audio processi
 - ✅ Clean up old completed jobs
 - ✅ Optional tracking with --track-job flag
 
+### Background Processing & Queue System
+- ✅ Worker pool for background job processing
+- ✅ Async job submission with --async flag
+- ✅ Multiple concurrent workers
+- ✅ Worker management (start/stop/status/restart)
+- ✅ Process-based workers for CPU-bound operations
+- ✅ Graceful shutdown with signal handling
+
 ### Logging & Monitoring
 - ✅ Rich console logging with colors and tracebacks
 - ✅ Rotating file logs (10MB, 5 backups)
@@ -199,7 +207,45 @@ video-tool jobs clean --older-than 30
 
 Enables job tracking and history for monitoring and debugging.
 
-### 9. Show Version
+### 9. Background Processing with Workers
+
+```bash
+# Terminal 1: Start worker pool
+video-tool worker start --workers 2
+
+# Terminal 2: Submit jobs asynchronously
+video-tool cut -i movie.mp4 -o ./output -d 11 --async
+# Returns: Job ID: 123
+
+video-tool concat -i part1.mp4 -i part2.mp4 -o final.mp4 --async
+# Returns: Job ID: 124
+
+# Monitor job status
+video-tool jobs list
+video-tool jobs show 123
+video-tool jobs logs 123
+
+# Manage workers
+video-tool worker status
+video-tool worker stop
+video-tool worker restart --workers 4
+```
+
+**How it works:**
+- Start worker pool to process jobs in background
+- Submit jobs with `--async` flag
+- Workers process jobs from queue automatically
+- Monitor progress with jobs commands
+- Graceful shutdown with Ctrl+C
+
+**Benefits:**
+- Process multiple videos concurrently
+- Submit jobs and continue working
+- No blocking during long operations
+- Worker crash recovery
+- Scalable with multiple workers
+
+### 10. Show Version
 
 ```bash
 video-tool version
@@ -482,10 +528,11 @@ flake8 src/
 ### Phase 2: Production-Ready 🚧 IN PROGRESS
 - ✅ Re-encoding with profile support (Task 2.1 complete)
 - ✅ Hardware acceleration (VideoToolbox on macOS)
-- [ ] Job queue for batch processing
+- ✅ Job queue for batch processing (Task 2.5 complete)
+- ✅ Background workers with async job submission
+- [ ] Enhanced error handling with automatic retry
 - [ ] Web UI for visual workflow management
 - [ ] REST API for programmatic access
-- [ ] Enhanced error recovery
 
 ### Phase 3: Advanced Features (Future)
 - [ ] Hardware acceleration (GPU encoding)
